@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "quasa0-ai-paint.*\\.vercel\\.app" }],
+      "destination": "https://paint.quasa0.com/$1",
+      "permanent": false
+    }
+  ]
+}

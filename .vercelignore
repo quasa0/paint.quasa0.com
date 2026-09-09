@@ -1,0 +1,8 @@
+node_modules
+*.mov
+*.mp4
+*.zip
+*.png
+!public/**
+dist
+launch-video/

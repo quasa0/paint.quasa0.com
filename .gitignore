@@ -1,0 +1,14 @@
+node_modules
+dist
+.vercel
+.DS_Store
+*.local
+*.mov
+*.mp4
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+/launch-video/
+/worklog.md
