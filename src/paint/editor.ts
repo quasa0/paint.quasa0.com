@@ -98,6 +98,11 @@ export interface EditorState {
   guides: { x: number | null; y: number | null };
   /** Last AI prompt, for "repaint again" and ↑ recall. */
   lastPrompt: string;
+  /** Every prompt sent so far, newest first (persisted, shared across drawings). */
+  prompts: PromptEntry[];
+  showPrompts: boolean;
+  /** Text to drop into the prompt box; `n` changes on every request so the same text can be reused. */
+  promptFill: { text: string; n: number };
   /** Persistent history of the current drawing (V1, V2, …) and the version on screen. */
   versions: VersionMeta[];
   headId: string | null;
@@ -137,6 +142,8 @@ const SETTINGS_KEY = 'ai-paint:settings';
 const DOC_KEY = 'ai-paint:doc';
 const KEY_KEY = 'ai-paint:openai-key';
 const CURRENT_KEY = 'ai-paint:current';
+const PROMPTS_KEY = 'ai-paint:prompts';
+const MAX_PROMPTS = 200;
 
 interface PersistedSettings {
   color1?: string;
@@ -148,6 +155,26 @@ interface PersistedSettings {
   theme?: Theme;
   showLibrary?: boolean;
   showVersions?: boolean;
+  showPrompts?: boolean;
+}
+
+/** One line of the Prompts section: every prompt ever sent, newest first, deduplicated. */
+export interface PromptEntry {
+  id: string;
+  text: string;
+  /** Last time it was sent. */
+  usedAt: number;
+  uses: number;
+}
+
+function loadPrompts(): PromptEntry[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((p): p is PromptEntry => !!p && typeof p.id === 'string' && typeof p.text === 'string');
+  } catch {
+    return [];
+  }
 }
 
 function loadSettings(): PersistedSettings {
@@ -199,12 +226,13 @@ export class Editor {
 
   constructor() {
     const s = loadSettings();
+    const prompts = loadPrompts();
     this.doc = new PaintDoc(DEFAULT_SIZE.w, DEFAULT_SIZE.h);
     this.preview = makeCanvas(DEFAULT_SIZE.w, DEFAULT_SIZE.h);
     this.pctx = ctx2d(this.preview);
     this.state = {
-      tool: 'pencil',
-      prevTool: 'pencil',
+      tool: 'select',
+      prevTool: 'select',
       brushShape: 'round',
       brushSize: BRUSH_SIZES[1],
       eraserSize: ERASER_SIZES[1],
@@ -253,7 +281,10 @@ export class Editor {
       showLibrary: s.showLibrary ?? true,
       fitRequest: 0,
       guides: { x: null, y: null },
-      lastPrompt: '',
+      lastPrompt: prompts[0]?.text ?? '',
+      prompts,
+      showPrompts: s.showPrompts ?? true,
+      promptFill: { text: '', n: 0 },
       blank: true,
       versions: [],
       headId: null,
@@ -429,6 +460,58 @@ export class Editor {
     this.persistSettings();
   }
 
+  setShowPrompts(showPrompts: boolean): void {
+    this.set({ showPrompts });
+    this.persistSettings();
+  }
+
+  private persistPrompts(prompts: PromptEntry[]): void {
+    try {
+      localStorage.setItem(PROMPTS_KEY, JSON.stringify(prompts));
+    } catch {
+      /* quota */
+    }
+  }
+
+  /** Move `text` to the top of the Prompts list (or add it). Exact duplicates collapse into one entry. */
+  private rememberPrompt(text: string): void {
+    const t = text.trim();
+    if (!t) return;
+    const prev = this.state.prompts.find((p) => p.text === t);
+    const entry: PromptEntry = prev
+      ? { ...prev, usedAt: Date.now(), uses: prev.uses + 1 }
+      : { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, text: t, usedAt: Date.now(), uses: 1 };
+    const prompts = [entry, ...this.state.prompts.filter((p) => p.text !== t)].slice(0, MAX_PROMPTS);
+    this.set({ prompts });
+    this.persistPrompts(prompts);
+  }
+
+  deletePrompt(id: string): void {
+    const prompts = this.state.prompts.filter((p) => p.id !== id);
+    this.set({ prompts });
+    this.persistPrompts(prompts);
+  }
+
+  /** Put a saved prompt into the prompt box (needs a selection, since the box lives under it). */
+  usePrompt(text: string): void {
+    if (!this.state.selection) {
+      this.set({ status: 'Select an area first, then click a prompt to reuse it. (↑ in the prompt box recalls the last one.)' });
+      return;
+    }
+    this.set({ promptFill: { text, n: this.state.promptFill.n + 1 }, status: 'Prompt filled in. Press ↵ to repaint the selection.' });
+  }
+
+  async copyPrompt(text: string): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.set({ status: 'Prompt copied.' });
+      return true;
+    } catch {
+      this.set({ status: 'Could not copy. Select the text and copy it manually.' });
+      return false;
+    }
+  }
+
   /** Called by drawing gestures: from now on changes are saved. */
   private touch(): void {
     if (this.state.blank) this.set({ blank: false });
@@ -439,9 +522,9 @@ export class Editor {
   }
 
   private persistSettings(): void {
-    const { color1, color2, customColors, model, quality, editMode, theme, showLibrary, showVersions } = this.state;
+    const { color1, color2, customColors, model, quality, editMode, theme, showLibrary, showVersions, showPrompts } = this.state;
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ color1, color2, customColors, model, quality, editMode, theme, showLibrary, showVersions } satisfies PersistedSettings));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ color1, color2, customColors, model, quality, editMode, theme, showLibrary, showVersions, showPrompts } satisfies PersistedSettings));
     } catch {
       /* quota */
     }
@@ -1875,6 +1958,7 @@ export class Editor {
     const before = this.doc.ctx.getImageData(sel.x, sel.y, sel.w, sel.h).data;
     const job: AiJob = { id, rect: sel, path, prompt: prompt.trim(), status: 'running', message: 'Starting…' };
     this.set({ lastPrompt: prompt.trim() });
+    this.rememberPrompt(prompt);
     // The job overlay now shows this area; free the live selection for the next edit.
     this.set({ jobs: [...this.state.jobs, job], selection: null, selectionPath: null, ai: { status: 'running', message: 'Generating…' } });
     try {

@@ -4,7 +4,7 @@ export type IconName =
   | 'freeSelect' | 'select' | 'eraser' | 'fill' | 'picker' | 'magnifier' | 'pencil' | 'brush' | 'airbrush' | 'text'
   | 'line' | 'curve' | 'rect' | 'polygon' | 'ellipse' | 'roundRect'
   | 'sparkle' | 'key' | 'check' | 'chevron' | 'undo' | 'redo' | 'close' | 'logo' | 'swap' | 'sun' | 'moon' | 'plus'
-  | 'alignLeft' | 'alignCenterH' | 'alignRight' | 'alignTop' | 'alignMiddle' | 'alignBottom' | 'center' | 'flipH' | 'flipV' | 'rotateCw' | 'rotateCcw' | 'duplicate' | 'trash' | 'crop' | 'fit' | 'copyPng' | 'download';
+  | 'alignLeft' | 'alignCenterH' | 'alignRight' | 'alignTop' | 'alignMiddle' | 'alignBottom' | 'center' | 'flipH' | 'flipV' | 'rotateCw' | 'rotateCcw' | 'duplicate' | 'trash' | 'crop' | 'fit' | 'copyPng' | 'download' | 'copy';
 
 const paths: Record<IconName, JSX.Element> = {
   freeSelect: <path d="M3.5 6.5c0-2 2-3.5 4.5-3.5s5 1.5 5 3.5c0 1.5-1.5 2-2.5 3S9 12.5 7.5 13 3.5 11 3.5 6.5z" strokeDasharray="2 1.5" />,
@@ -104,6 +104,7 @@ const paths: Record<IconName, JSX.Element> = {
   crop: <path d="M5 1v10h10M1 5h10v10" />,
   copyPng: (<><rect x="2.5" y="2.5" width="8" height="8" rx="1" /><path d="M5.5 13.5h8v-8" /><path d="M4 8.5l2-2 2 2 1.5-1.5 1 1" /></>),
   download: <path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M3 13.5h10" />,
+  copy: (<><rect x="5.5" y="5.5" width="8" height="8" rx="1" /><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" /></>),
   fit: (<><rect x="2.5" y="2.5" width="11" height="11" /><path d="M5.5 5.5h5v5h-5z" strokeDasharray="1.5 1" /></>),
 };
 

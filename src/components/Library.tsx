@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { useEditor, useEditorState } from '../hooks';
 import { Icon } from './Icons';
 import { Versions } from './Versions';
+import { Prompts } from './Prompts';
 
 function fmtDate(t: number): { day: string; time: string } {
   const d = new Date(t);
@@ -103,6 +104,7 @@ export function Library(): JSX.Element {
       </div>
       </div>
       {s.showVersions && <Versions />}
+      {s.showPrompts && <Prompts />}
     </aside>
   );
 }

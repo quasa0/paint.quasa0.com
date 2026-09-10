@@ -991,11 +991,11 @@ kbd {
 .library-top {
   display: flex;
   flex-direction: column;
-  flex: 1 1 50%;
+  flex: 1 1 34%;
   min-height: 120px;
 }
 .versions {
-  flex: 1 1 50%;
+  flex: 1 1 33%;
   min-height: 120px;
   display: flex;
   flex-direction: column;
@@ -1059,6 +1059,91 @@ kbd {
 .ver-from {
   font-size: 10px;
   color: var(--fg-3);
+}
+
+/* ---------- prompts (below history) ---------- */
+.prompts {
+  flex: 1 1 33%;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+.prompts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prompt-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  cursor: default;
+  color: var(--fg-2);
+}
+.prompt-item:hover {
+  background: var(--bg-3);
+  color: var(--fg);
+}
+.prompt-text {
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.prompt-when {
+  font-size: 10.5px;
+  color: var(--fg-3);
+}
+.prompt-actions {
+  position: absolute;
+  right: 6px;
+  top: 5px;
+  display: none;
+  gap: 4px;
+  padding-left: 12px;
+  background: linear-gradient(90deg, transparent, var(--bg-3) 12px);
+}
+.prompt-item:hover .prompt-actions,
+.prompt-item.armed .prompt-actions {
+  display: inline-flex;
+}
+.prompt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-2);
+  font-size: 11px;
+  font-weight: 500;
+}
+.prompt-btn:hover {
+  color: var(--fg);
+  border-color: var(--border-2);
+}
+.prompt-btn.ok {
+  color: var(--success, #0a7f3f);
+  border-color: currentColor;
+}
+.prompt-btn.armed {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+  padding: 0 7px;
 }
 
 /* ---------- drawings library ---------- */

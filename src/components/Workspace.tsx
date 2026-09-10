@@ -332,10 +332,16 @@ function AiBar({ anchor }: { anchor: { left: number; top: number; width: number;
   const bar = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: Math.max(8, anchor.left), top: anchor.top + anchor.height + 8 });
   const hasKey = !!s.apiKey || !!s.oauth;
+  // A click in the Prompts section drops that text here (state-from-props pattern, no effect needed).
+  const [seenFill, setSeenFill] = useState(s.promptFill.n);
+  if (s.promptFill.n !== seenFill) {
+    setSeenFill(s.promptFill.n);
+    setPrompt(s.promptFill.text);
+  }
 
   useEffect(() => {
     if (hasKey) input.current?.focus();
-  }, [hasKey]);
+  }, [hasKey, s.promptFill.n]);
 
   // Grow with the text up to five lines, then scroll.
   useLayoutEffect(() => {

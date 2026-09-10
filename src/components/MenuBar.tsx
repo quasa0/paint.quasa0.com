@@ -175,6 +175,7 @@ export function MenuBar({ workspace }: { workspace: RefObject<WorkspaceHandle | 
           <Item label="Gridlines" checked={s.gridlines} onSelect={() => editor.setGridlines(!s.gridlines)} />
           <Item label="Drawings sidebar" checked={s.showLibrary} onSelect={() => editor.setShowLibrary(!s.showLibrary)} />
           <Item label="History strip" checked={s.showVersions} onSelect={() => editor.setShowVersions(!s.showVersions)} />
+          <Item label="Prompts list" checked={s.showPrompts} onSelect={() => editor.setShowPrompts(!s.showPrompts)} />
           <Sep />
           <Item label="Appearance: System" checked={s.theme === 'system'} onSelect={() => editor.setTheme('system')} />
           <Item label="Appearance: Light" checked={s.theme === 'light'} onSelect={() => editor.setTheme('light')} />
