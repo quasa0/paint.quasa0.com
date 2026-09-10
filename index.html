@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Paint with GPT Image 2.5 – MS Paint that repaints your selection with AI</title>
-    <meta name="description" content="A free, open-source Microsoft Paint clone with GPT Image 2.5 inpainting. Draw, select an area, describe the edit, and the AI repaints only your selection. Runs in the browser with your own OpenAI key." />
+    <meta name="description" content="A free, open-source Microsoft Paint clone with GPT Image 2.5 inpainting. Draw, select an area, describe the edit, and the AI repaints only your selection. Sign in with your ChatGPT plan or use your own OpenAI key." />
     <link rel="canonical" href="https://paint.quasa0.com/" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/og/apple-touch-icon.png" />
@@ -16,7 +16,7 @@
     <meta property="og:site_name" content="Paint" />
     <meta property="og:url" content="https://paint.quasa0.com/" />
     <meta property="og:title" content="MS Paint, with GPT Image 2.5" />
-    <meta property="og:description" content="Draw. Select an area. Describe the edit. The AI repaints only what you selected. Free, open source, bring your own OpenAI key." />
+    <meta property="og:description" content="Draw. Select an area. Describe the edit. The AI repaints only what you selected. Free, open source. Sign in with ChatGPT or bring your own key." />
     <meta property="og:image" content="https://paint.quasa0.com/og/cover.png" />
     <meta property="og:image:secure_url" content="https://paint.quasa0.com/og/cover.png" />
     <meta property="og:image:type" content="image/png" />
@@ -30,7 +30,7 @@
     <meta name="twitter:site" content="@quasa0" />
     <meta name="twitter:creator" content="@quasa0" />
     <meta name="twitter:title" content="MS Paint, with GPT Image 2.5" />
-    <meta name="twitter:description" content="Draw. Select an area. Describe the edit. The AI repaints only what you selected. Free, open source, bring your own OpenAI key." />
+    <meta name="twitter:description" content="Draw. Select an area. Describe the edit. The AI repaints only what you selected. Free, open source. Sign in with ChatGPT or bring your own key." />
     <meta name="twitter:image" content="https://paint.quasa0.com/og/cover.png" />
     <meta name="twitter:image:alt" content="Paint: MS Paint with GPT Image 2.5. Screenshot of the editor next to the headline." />
 
@@ -51,7 +51,7 @@
           "url": "https://paint.quasa0.com/",
           "applicationCategory": "DesignApplication",
           "operatingSystem": "Web browser",
-          "browserRequirements": "Requires a modern browser with IndexedDB. AI edits require an OpenAI API key.",
+          "browserRequirements": "Requires a modern browser with IndexedDB. AI edits require an OpenAI sign-in (ChatGPT plan) or an API key.",
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
           "license": "https://opensource.org/licenses/MIT",
           "isAccessibleForFree": true,
@@ -76,7 +76,7 @@
             {
               "@type": "Question",
               "name": "Is it free?",
-              "acceptedAnswer": { "@type": "Answer", "text": "Yes. Paint is open source under the MIT license and has no server. AI edits call the OpenAI API with your own key, so OpenAI bills you per generated image." }
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. Paint is open source under the MIT license. AI edits use either your ChatGPT plan (sign in with OpenAI) or your own API key, billed per image by OpenAI." }
             },
             {
               "@type": "Question",
@@ -130,7 +130,7 @@
         <p class="l-lede">Draw, select an area, describe the edit. The AI repaints only what you selected. Everything else stays exactly as you drew it.</p>
         <div class="l-cta">
           <a class="l-btn l-btn-lg" href="/app/" id="start">Start drawing</a>
-          <span class="l-cta-note">Free. Drawing tools work without a key; AI edits use your own OpenAI key.</span>
+          <span class="l-cta-note">Free. Drawing tools need nothing; AI edits use your ChatGPT plan or your own OpenAI key.</span>
         </div>
         <figure class="l-shot">
           <picture>
@@ -168,7 +168,7 @@
         <h2>Questions</h2>
         <details open>
           <summary>Is it free?</summary>
-          <p>Yes. Paint is open source under the MIT license and has no server. AI edits call the OpenAI API with your own key, so OpenAI bills you per generated image (a few cents each at medium quality).</p>
+          <p>Yes. Paint is open source under the MIT license. For AI edits, sign in with OpenAI to use your ChatGPT Plus, Pro or Team plan, or paste your own API key and pay OpenAI per image (a few cents each at medium quality).</p>
         </details>
         <details>
           <summary>Does the AI change the whole image?</summary>
@@ -176,7 +176,7 @@
         </details>
         <details>
           <summary>Where are my drawings and API key stored?</summary>
-          <p>In your browser: drawings and their version history in IndexedDB, settings and the key in localStorage. Nothing is uploaded except the selected pixels sent to OpenAI when you generate. Clearing site data removes everything, so export what you want to keep.</p>
+          <p>In your browser: drawings and their version history in IndexedDB, settings, your key or sign-in tokens in localStorage. Nothing is uploaded except the selected pixels sent to OpenAI when you generate. With the OpenAI sign-in, that request is relayed through a small function on this site because chatgpt.com does not accept browser requests; the relay stores nothing. Clearing site data removes everything, so export what you want to keep.</p>
         </details>
         <details>
           <summary>Which models does it use?</summary>

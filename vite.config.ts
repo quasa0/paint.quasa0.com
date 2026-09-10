@@ -16,6 +16,33 @@ function devKeyPlugin(): Plugin {
         res.setHeader('Content-Type', 'text/plain');
         res.end(process.env.AI_PAINT_TEST_KEY ?? '');
       });
+      // Dev-only: hand the local Codex CLI login to the page so the sign-in path can be tested
+      // without an interactive device-code approval. Only when AI_PAINT_DEV_OAUTH=1.
+      server.middlewares.use('/__devoauth', async (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        if (process.env.AI_PAINT_DEV_OAUTH !== '1') {
+          res.statusCode = 404;
+          res.end('{}');
+          return;
+        }
+        try {
+          const { readFile } = await import('node:fs/promises');
+          const { homedir } = await import('node:os');
+          const a = JSON.parse(await readFile(`${homedir()}/.codex/auth.json`, 'utf8')) as { tokens: { access_token: string; refresh_token: string; id_token: string; account_id: string } };
+          const claims = JSON.parse(Buffer.from(a.tokens.access_token.split('.')[1], 'base64url').toString()) as { exp?: number };
+          res.end(JSON.stringify({ accessToken: a.tokens.access_token, refreshToken: a.tokens.refresh_token, idToken: a.tokens.id_token, accountId: a.tokens.account_id, expiresAt: (claims.exp ?? 0) * 1000, email: 'dev@local', plan: 'pro' }));
+        } catch (e) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: String(e) }));
+        }
+      });
+      // Run the Vercel function locally so "Sign in with OpenAI" works under `vite`.
+      server.middlewares.use('/api/codex-images', (req, res) => {
+        void server.ssrLoadModule('/api/codex-images.ts').then((m) => (m.default as (q: typeof req, r: typeof res) => Promise<void>)(req, res)).catch((e) => {
+          res.statusCode = 500;
+          res.end(String(e));
+        });
+      });
     },
   };
 }

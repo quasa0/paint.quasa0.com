@@ -331,7 +331,7 @@ function AiBar({ anchor }: { anchor: { left: number; top: number; width: number;
   const input = useRef<HTMLTextAreaElement>(null);
   const bar = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: Math.max(8, anchor.left), top: anchor.top + anchor.height + 8 });
-  const hasKey = !!s.apiKey;
+  const hasKey = !!s.apiKey || !!s.oauth;
 
   useEffect(() => {
     if (hasKey) input.current?.focus();
@@ -397,8 +397,8 @@ function AiBar({ anchor }: { anchor: { left: number; top: number; width: number;
         </>
       ) : (
         <button type="button" className="ai-addkey" onClick={() => editor.openDialog('key')} data-testid="ai-addkey">
-          <Icon name="key" size={13} />
-          Add API key to repaint this area
+          <Icon name="logo" size={13} />
+          Sign in with OpenAI to repaint this area
         </button>
       )}
     </div>

@@ -150,7 +150,7 @@ export function MenuBar({ workspace }: { workspace: RefObject<WorkspaceHandle | 
           <Item label="Export Selection as PNG" disabled={!s.selection} onSelect={() => editor.exportImage({ format: 'png', selectionOnly: true })} />
           <Sep />
           <Item label="Attributes…" shortcut={`${MOD}E`} onSelect={() => editor.openDialog('attributes')} />
-          <Item label="OpenAI API key…" onSelect={() => editor.openDialog('key')} />
+          <Item label="Connect OpenAI…" onSelect={() => editor.openDialog('key')} />
         </Menu>
         <Menu id="edit" label="Edit">
           <Item label="Undo" shortcut={`${MOD}Z`} disabled={!s.canUndo && !s.pending} onSelect={() => editor.undo()} />
@@ -214,9 +214,9 @@ export function MenuBar({ workspace }: { workspace: RefObject<WorkspaceHandle | 
         <button type="button" className="icon-btn" onClick={() => editor.setTheme(resolvedTheme(s.theme) === 'dark' ? 'light' : 'dark')} title="Toggle light / dark" aria-label="Toggle appearance" data-testid="theme-toggle">
           <Icon name={resolvedTheme(s.theme) === 'dark' ? 'sun' : 'moon'} size={14} />
         </button>
-        <button type="button" className={`key-btn ${s.apiKey ? 'set' : ''}`} onClick={() => editor.openDialog('key')} title="OpenAI API key (stored only in this browser)" data-testid="key-btn">
-          <Icon name="key" size={13} />
-          {s.apiKey ? 'API key set' : 'Add API key'}
+        <button type="button" className={`key-btn ${s.oauth || s.apiKey ? 'set' : ''}`} onClick={() => editor.openDialog('key')} title={s.oauth ? `Signed in with OpenAI${s.oauth.email ? ` as ${s.oauth.email}` : ''}` : s.apiKey ? 'Using an API key (stored only in this browser)' : 'Sign in with OpenAI or add an API key'} data-testid="key-btn">
+          <Icon name={s.oauth ? 'logo' : 'key'} size={13} />
+          {s.oauth ? (s.oauth.email ? s.oauth.email.split('@')[0] : 'OpenAI') : s.apiKey ? 'API key set' : 'Sign in with OpenAI'}
         </button>
 
         <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void editor.openFile(f).then(() => workspace.current?.fit()); e.target.value = ''; }} />

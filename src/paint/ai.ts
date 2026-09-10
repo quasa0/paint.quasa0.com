@@ -106,13 +106,16 @@ export function buildPrompt(userPrompt: string, mode: EditMode, region: string):
   ].join(' ');
 }
 
+/** How requests are authorized: a personal API key, or an OpenAI (ChatGPT) sign-in relayed by /api/codex-images. */
+export type AiAuth = { kind: 'apiKey'; apiKey: string } | { kind: 'openai'; accessToken: string; accountId: string };
+
 export interface InpaintOptions {
   source: HTMLCanvasElement;
   selection: Rect;
   /** Optional free-form outline in document coordinates; only pixels inside it are edited. */
   path?: Pt[] | null;
   prompt: string;
-  apiKey: string;
+  auth: AiAuth;
   model: ModelId;
   quality: Quality;
   mode?: EditMode;
@@ -203,6 +206,38 @@ export function describeRegion(r: Rect, w: number, h: number): string {
   return `spanning ${pct(r.x, w)}–${pct(r.x + r.w, w)} of the width and ${pct(r.y, h)}–${pct(r.y + r.h, h)} of the height (from the top-left)`;
 }
 
+/** Same edit through the OpenAI sign-in: JSON body, relayed by our function because chatgpt.com blocks browser origins. */
+async function callEditsViaOpenAI(body: Record<string, unknown>, auth: Extract<AiAuth, { kind: 'openai' }>, signal?: AbortSignal): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch('/api/codex-images?op=edits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.accessToken}`, 'chatgpt-account-id': auth.accountId },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e;
+    throw new OpenAIError(0, 'Could not reach the server.');
+  }
+  const text = await res.text();
+  let json: { data?: { b64_json?: string }[]; error?: { message?: string }; detail?: string } = {};
+  try {
+    json = JSON.parse(text);
+  } catch {
+    /* non-JSON */
+  }
+  if (!res.ok) {
+    const detail = json.error?.message || json.detail || `OpenAI request failed (${res.status})`;
+    if (res.status === 401) throw new OpenAIError(401, `Your OpenAI session is not valid. Sign in again. ${detail}`);
+    if (res.status === 429) throw new OpenAIError(429, `Usage limit reached on your ChatGPT plan. ${detail}`);
+    throw new OpenAIError(res.status, detail);
+  }
+  const b64 = json.data?.[0]?.b64_json;
+  if (!b64) throw new OpenAIError(res.status, 'OpenAI returned no image data');
+  return b64;
+}
+
 async function callEdits(form: FormData, apiKey: string, signal?: AbortSignal): Promise<string> {
   let res: Response;
   try {
@@ -267,13 +302,28 @@ export async function inpaint(opts: InpaintOptions): Promise<InpaintResult> {
 
   onStatus?.(`Generating with ${opts.model}…`);
   let b64: string;
-  try {
-    b64 = await callEdits(makeForm(true), opts.apiKey, opts.signal);
-  } catch (e) {
-    // Older/newer model snapshots may reject input_fidelity; retry once without it.
-    if (e instanceof OpenAIError && e.status === 400 && /input_fidelity/i.test(e.message)) {
-      b64 = await callEdits(makeForm(false), opts.apiKey, opts.signal);
-    } else throw e;
+  if (opts.auth.kind === 'openai') {
+    // The sign-in backend keeps the input's aspect ratio but picks its own resolution (~1.6 MP);
+    // the crop is already at the target aspect, and the result is resampled to the exact size below.
+    const body: Record<string, unknown> = {
+      model: opts.model,
+      prompt: buildPrompt(opts.prompt, mode, region),
+      images: [{ image_url: image.toDataURL('image/png') }],
+      size: `${plan.outW}x${plan.outH}`,
+      quality: opts.quality,
+    };
+    if (mode !== 'nomask' && mode !== 'selection') body.mask = { image_url: mask.toDataURL('image/png') };
+    if (mode === 'maskref') body.images = [{ image_url: image.toDataURL('image/png') }, { image_url: image.toDataURL('image/png') }];
+    b64 = await callEditsViaOpenAI(body, opts.auth, opts.signal);
+  } else {
+    try {
+      b64 = await callEdits(makeForm(true), opts.auth.apiKey, opts.signal);
+    } catch (e) {
+      // Older/newer model snapshots may reject input_fidelity; retry once without it.
+      if (e instanceof OpenAIError && e.status === 400 && /input_fidelity/i.test(e.message)) {
+        b64 = await callEdits(makeForm(false), opts.auth.apiKey, opts.signal);
+      } else throw e;
+    }
   }
 
   onStatus?.('Applying result…');

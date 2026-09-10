@@ -1,6 +1,7 @@
 import { PaintDoc, clipRect, ctx2d, hexToRgba, loadImage, makeCanvas, normRect, rectContains, type Pt, type Rect } from './doc';
 import * as draw from './draw';
 import { inpaint, pathToPath2D, type EditMode, type ModelId, type Quality } from './ai';
+import { ensureFresh, loadOAuth, loadOAuthFromDb, requestDeviceCode, saveOAuth, waitForDeviceApproval, type DeviceCode, type OAuthTokens } from './oauth';
 import { canvasToBlob, deleteDrawing, deleteVersion, deleteVersionsOf, getDrawing, getVersion, listDrawings, listVersions, makeThumb, newId, openDb, putDrawing, putVersion, type DrawingMeta, type VersionMeta } from './library';
 import { PALETTE, AIRBRUSH_SIZES, BRUSH_SIZES, ERASER_SIZES, LINE_WIDTHS, MAGNIFIER_ZOOMS, TOOLS, clampZoom, type BrushShape, type FillMode, type ShapeKind, type ToolId } from './tools';
 
@@ -72,6 +73,10 @@ export interface EditorState {
   ai: AiState;
   jobs: AiJob[];
   apiKey: string;
+  /** OpenAI sign-in (ChatGPT plan). Preferred over the API key when present. */
+  oauth: OAuthTokens | null;
+  /** Device-code sign-in in progress. */
+  signIn: { code: DeviceCode; status: 'waiting' | 'error'; message?: string } | null;
   model: ModelId;
   quality: Quality;
   editMode: EditMode;
@@ -230,6 +235,8 @@ export class Editor {
       ai: { status: 'idle', message: '' },
       jobs: [],
       apiKey: loadKey(),
+      oauth: loadOAuth(),
+      signIn: null,
       model: s.model ?? 'gpt-image-2.5-flare',
       quality: s.quality ?? 'medium',
       editMode: s.editMode ?? 'selection',
@@ -256,6 +263,7 @@ export class Editor {
     void this.initLibrary();
     // localStorage can be missing (private mode, storage pressure); fall back to the IndexedDB copy.
     if (!this.state.apiKey) void loadKeyFromDb().then((k) => { if (k && !this.state.apiKey) this.set({ apiKey: k }); });
+    if (!this.state.oauth) void loadOAuthFromDb().then((t) => { if (t && !this.state.oauth) this.set({ oauth: t }); });
   }
 
   // ---------- store plumbing ----------
@@ -718,6 +726,51 @@ export class Editor {
     this.set({ apiKey });
     saveKey(apiKey);
   }
+  /** True when generation is possible with either auth method. */
+  get canGenerate(): boolean {
+    return !!this.state.oauth || !!this.state.apiKey;
+  }
+
+  private signInAbort: AbortController | null = null;
+
+  /** Start "Sign in with OpenAI": shows a code, then waits for approval on auth.openai.com. */
+  async signInWithOpenAI(): Promise<void> {
+    this.signInAbort?.abort();
+    const abort = new AbortController();
+    this.signInAbort = abort;
+    try {
+      const code = await requestDeviceCode();
+      this.set({ signIn: { code, status: 'waiting' } });
+      const tokens = await waitForDeviceApproval(code, abort.signal);
+      if (abort.signal.aborted) return;
+      saveOAuth(tokens);
+      this.set({ oauth: tokens, signIn: null, dialog: 'none', status: `Signed in to OpenAI${tokens.email ? ` as ${tokens.email}` : ''}.` });
+    } catch (e) {
+      if (abort.signal.aborted) return;
+      const message = e instanceof Error ? e.message : String(e);
+      this.set({ signIn: this.state.signIn ? { ...this.state.signIn, status: 'error', message } : null, ai: this.state.signIn ? this.state.ai : { status: 'error', message } });
+    } finally {
+      if (this.signInAbort === abort) this.signInAbort = null;
+    }
+  }
+
+  cancelSignIn(): void {
+    this.signInAbort?.abort();
+    this.signInAbort = null;
+    this.set({ signIn: null });
+  }
+
+  /** Adopt tokens obtained elsewhere (tests, future flows). */
+  setOAuth(tokens: OAuthTokens | null): void {
+    saveOAuth(tokens);
+    this.set({ oauth: tokens });
+  }
+
+  signOutOpenAI(): void {
+    saveOAuth(null);
+    this.set({ oauth: null });
+  }
+
   setModel(model: ModelId): void {
     this.set({ model });
     this.persistSettings();
@@ -1786,9 +1839,26 @@ export class Editor {
   async generate(prompt: string): Promise<void> {
     const s = this.state;
     if (!prompt.trim()) return;
-    if (!s.apiKey) {
+    if (!this.canGenerate) {
       this.set({ dialog: 'key' });
       return;
+    }
+    let auth: import('./ai').AiAuth;
+    if (s.oauth) {
+      try {
+        const fresh = await ensureFresh(s.oauth);
+        if (fresh !== s.oauth) {
+          saveOAuth(fresh);
+          this.set({ oauth: fresh });
+        }
+        auth = { kind: 'openai', accessToken: fresh.accessToken, accountId: fresh.accountId };
+      } catch (e) {
+        this.set({ oauth: null, ai: { status: 'error', message: e instanceof Error ? e.message : String(e) }, dialog: 'key' });
+        saveOAuth(null);
+        return;
+      }
+    } else {
+      auth = { kind: 'apiKey', apiKey: s.apiKey };
     }
     this.commitFloating();
     const sel = s.selection && clipRect(s.selection, this.doc.width, this.doc.height);
@@ -1813,7 +1883,7 @@ export class Editor {
         selection: sel,
         path,
         prompt,
-        apiKey: s.apiKey,
+        auth,
         model: this.state.model,
         quality: this.state.quality,
         mode: this.state.editMode,

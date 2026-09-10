@@ -20,7 +20,7 @@ Draw, select an area, and describe the edit. Paint puts the result back into you
 
 1. Open an image or draw something.
 2. Select an area with the rectangle or lasso tool.
-3. Add your own OpenAI API key and enter a prompt, such as “Make this chart more impressive.”
+3. Sign in with OpenAI (uses your ChatGPT plan) or add your own API key, then enter a prompt, such as “Make this chart more impressive.”
 4. Generate. Continue working elsewhere while the edit runs, or undo the result if you prefer the original.
 
 By default, the model receives the selection's bounding rectangle. **Image → AI sees surroundings too** includes nearby pixels for context. For a lasso, the request can include pixels outside its outline but inside that rectangle; Paint clips the returned patch to the lasso. Pixels outside the selection stay unchanged.
@@ -43,7 +43,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. Drawing tools work without an API key; AI edits require an OpenAI account with access to the configured image models and API billing.
+Open the local URL printed by Vite. Drawing tools work without an account. AI edits need either an OpenAI sign-in (ChatGPT Plus, Pro or Team) or an API key with access to the image models. The sign-in path is relayed by the Vercel function in `api/codex-images.ts`, which the dev server also runs.
 
 | Command | Purpose |
 | --- | --- |
@@ -52,11 +52,11 @@ Open the local URL printed by Vite. Drawing tools work without an API key; AI ed
 | `npm run build` | Type-check and build the static app into `dist/` |
 | `npm run preview` | Preview the production build locally |
 
-To host your own copy, serve `dist/` from a static host. No application server or server-side API key is required. Each visitor supplies their own key.
+To host your own copy, deploy to Vercel (the `api/` function relays sign-in requests) or serve `dist/` from a static host with the API-key path only. No server-side key is required; each visitor brings their own account.
 
 ## Your images and API key
 
-Paint stores drawings and their version history in IndexedDB. It stores settings and your API key in localStorage, with an IndexedDB copy of the key. This storage belongs to the browser and site you use; clearing site data removes it. Export files you want to keep.
+Paint stores drawings and their version history in IndexedDB. It stores settings, your API key and sign-in tokens in localStorage, with an IndexedDB copy. This storage belongs to the browser and site you use; clearing site data removes it. Export files you want to keep.
 
 AI requests go directly from your browser to OpenAI's [image edits API](https://developers.openai.com/api/docs/guides/image-generation). Paint has no backend that collects your key or drawings. AI edits send your prompt and the image region described above to OpenAI, and OpenAI bills your account. The browser stores the key as readable text, so use the app only on devices and deployments you trust.
 

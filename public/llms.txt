@@ -5,4 +5,5 @@
 - Editor: https://paint.quasa0.com/app/
 - Source: https://github.com/quasa0/paint.quasa0.com
 - Models: gpt-image-2.5-flare (fast), gpt-image-2.5-sunburst (precise), via POST /v1/images/edits
+- Auth: "Sign in with OpenAI" (ChatGPT plan, device-code OAuth, relayed via /api/codex-images) or a personal API key.
 - Storage: drawings, branching version history and settings live in IndexedDB/localStorage in the visitor's browser; nothing is uploaded except the selection sent to OpenAI when the user generates.

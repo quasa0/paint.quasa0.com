@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { useEditor, useEditorState } from '../hooks';
 import { Icon } from './Icons';
+import { VERIFY_URL } from '../paint/oauth';
 
 function Modal({ title, children, onClose, actions, width }: { title: string; children: ReactNode; onClose: () => void; actions: ReactNode; width?: number }): JSX.Element {
   const box = useRef<HTMLDivElement>(null);
@@ -115,41 +116,102 @@ export function Dialogs(): JSX.Element | null {
 function KeyDialog({ onClose }: { onClose: () => void }): JSX.Element {
   const editor = useEditor();
   const s = useEditorState();
+  const [mode, setMode] = useState<'choose' | 'key'>(s.apiKey && !s.oauth ? 'key' : 'choose');
   const [value, setValue] = useState(s.apiKey);
   const [show, setShow] = useState(false);
   const save = () => {
     editor.setApiKey(value);
     onClose();
   };
+  const close = () => {
+    editor.cancelSignIn();
+    onClose();
+  };
+
+  if (s.oauth) {
+    return (
+      <Modal title="OpenAI account" onClose={close} actions={<button type="button" className="btn primary" onClick={close}>Done</button>}>
+        <div className="acct">
+          <span className="acct-dot" />
+          <div>
+            <div className="acct-name">{s.oauth.email ?? 'Signed in with OpenAI'}</div>
+            <div className="hint">ChatGPT {s.oauth.plan ? s.oauth.plan.charAt(0).toUpperCase() + s.oauth.plan.slice(1) : ''} plan · edits use your plan's included usage</div>
+          </div>
+          <button type="button" className="btn" onClick={() => editor.signOutOpenAI()} data-testid="signout">Sign out</button>
+        </div>
+        {s.apiKey && <p className="hint">An API key is also saved; the OpenAI sign-in is used while you are signed in.</p>}
+      </Modal>
+    );
+  }
+
+  if (s.signIn) {
+    const { code, status, message } = s.signIn;
+    return (
+      <Modal title="Sign in with OpenAI" onClose={close} actions={<button type="button" className="btn" onClick={close}>Cancel</button>}>
+        <p>Open the OpenAI device page and enter this code. This window completes on its own once you approve.</p>
+        <div className="device-code mono" data-testid="device-code" onClick={() => void navigator.clipboard?.writeText(code.userCode)} title="Click to copy">{code.userCode}</div>
+        <div className="device-actions">
+          <a className="btn primary" href={`${VERIFY_URL}?user_code=${encodeURIComponent(code.userCode)}`} target="_blank" rel="noopener" data-testid="device-open">Open auth.openai.com</a>
+          <span className={`device-status ${status}`}>{status === 'waiting' ? <><span className="spinner" /> Waiting for approval…</> : message}</span>
+        </div>
+        {status === 'error' && <p className="hint"><button type="button" className="link" onClick={() => void editor.signInWithOpenAI()}>Try again</button></p>}
+      </Modal>
+    );
+  }
+
+  if (mode === 'key') {
+    return (
+      <Modal
+        title="OpenAI API key"
+        onClose={close}
+        actions={
+          <>
+            {s.apiKey && <button type="button" className="btn" onClick={() => { editor.setApiKey(''); onClose(); }}>Remove</button>}
+            <button type="button" className="btn" onClick={() => setMode('choose')}>Back</button>
+            <button type="button" className="btn primary" onClick={save} data-testid="key-save">Save</button>
+          </>
+        }
+      >
+        <p>Paste a key with access to the Images API. It stays in this browser's local storage and goes directly to <code>api.openai.com</code> when you generate. Edits are billed to your OpenAI account.</p>
+        <div className="field">
+          <input
+            type={show ? 'text' : 'password'}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="sk-…"
+            aria-label="OpenAI API key"
+            autoFocus
+            spellCheck={false}
+            autoComplete="off"
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
+            data-testid="key-input"
+          />
+          <label className="check"><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show</label>
+        </div>
+        <p className="hint">Create one at platform.openai.com → API keys.</p>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal
-      title="OpenAI API key"
-      onClose={onClose}
-      actions={
-        <>
-          {s.apiKey && <button type="button" className="btn" onClick={() => { editor.setApiKey(''); onClose(); }}>Remove</button>}
-          <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn primary" onClick={save} data-testid="key-save">Save</button>
-        </>
-      }
-    >
-      <p>Paste a key with access to the Images API. It stays in this browser's local storage and goes directly to <code>api.openai.com</code> when you generate. Edits are billed to your OpenAI account.</p>
-      <div className="field">
-        <input
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="sk-…"
-          aria-label="OpenAI API key"
-          autoFocus
-          spellCheck={false}
-          autoComplete="off"
-          onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
-          data-testid="key-input"
-        />
-        <label className="check"><input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show</label>
+    <Modal title="Connect OpenAI" onClose={close} actions={<button type="button" className="btn" onClick={close}>Cancel</button>} width={460}>
+      <p>AI repaints need an OpenAI account. Pick one:</p>
+      <div className="connect-options">
+        <button type="button" className="connect-card" onClick={() => void editor.signInWithOpenAI()} data-testid="signin-openai">
+          <Icon name="logo" size={16} />
+          <div>
+            <div className="connect-title">Sign in with OpenAI</div>
+            <div className="hint">Use your ChatGPT Plus, Pro or Team plan. No key to paste; edits count toward your plan's usage.</div>
+          </div>
+        </button>
+        <button type="button" className="connect-card" onClick={() => setMode('key')} data-testid="use-key">
+          <Icon name="key" size={16} />
+          <div>
+            <div className="connect-title">Use an API key</div>
+            <div className="hint">Pay per image on your OpenAI API account. The key never leaves this browser.</div>
+          </div>
+        </button>
       </div>
-      <p className="hint">Create one at platform.openai.com → API keys. The key is saved for {typeof location !== 'undefined' ? location.host : 'this site'} and survives updates; it is only removed if you press Remove or clear site data.</p>
     </Modal>
   );
 }
