@@ -2,24 +2,201 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Paint, rebuilt. Select any area, describe it, and gpt-image-2.5 repaints just that rectangle in context." />
+    <title>Paint with GPT Image 2.5 – MS Paint that repaints your selection with AI</title>
+    <meta name="description" content="A free, open-source Microsoft Paint clone with GPT Image 2.5 inpainting. Draw, select an area, describe the edit, and the AI repaints only your selection. Runs in the browser with your own OpenAI key." />
+    <link rel="canonical" href="https://paint.quasa0.com/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/og/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Paint" />
+    <meta property="og:url" content="https://paint.quasa0.com/" />
+    <meta property="og:title" content="MS Paint, with GPT Image 2.5" />
+    <meta property="og:description" content="Draw. Select an area. Describe the edit. The AI repaints only what you selected. Free, open source, bring your own OpenAI key." />
+    <meta property="og:image" content="https://paint.quasa0.com/og/cover.png" />
+    <meta property="og:image:secure_url" content="https://paint.quasa0.com/og/cover.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Paint: MS Paint with GPT Image 2.5. Screenshot of the editor next to the headline." />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- X / Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@quasa0" />
+    <meta name="twitter:creator" content="@quasa0" />
+    <meta name="twitter:title" content="MS Paint, with GPT Image 2.5" />
+    <meta name="twitter:description" content="Draw. Select an area. Describe the edit. The AI repaints only what you selected. Free, open source, bring your own OpenAI key." />
+    <meta name="twitter:image" content="https://paint.quasa0.com/og/cover.png" />
+    <meta name="twitter:image:alt" content="Paint: MS Paint with GPT Image 2.5. Screenshot of the editor next to the headline." />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <title>Untitled – Paint</title>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="preload" as="image" href="/og/screenshot-light.jpg" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://paint.quasa0.com/#app",
+          "name": "Paint",
+          "alternateName": "Paint with GPT Image 2.5",
+          "url": "https://paint.quasa0.com/",
+          "applicationCategory": "DesignApplication",
+          "operatingSystem": "Web browser",
+          "browserRequirements": "Requires a modern browser with IndexedDB. AI edits require an OpenAI API key.",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+          "license": "https://opensource.org/licenses/MIT",
+          "isAccessibleForFree": true,
+          "screenshot": "https://paint.quasa0.com/og/screenshot-light.jpg",
+          "image": "https://paint.quasa0.com/og/cover.png",
+          "description": "A browser-based Microsoft Paint clone with GPT Image 2.5 inpainting: draw, select an area, describe the edit, and the model repaints only the selection.",
+          "featureList": [
+            "Rectangle and lasso selection repainted by GPT Image 2.5",
+            "Classic Paint tools: pencil, brushes, eraser, fill, text, lines, curves, shapes",
+            "Parallel AI jobs with per-job cancel",
+            "Branching version history saved in the browser",
+            "Paste, move, resize, rotate, flip, align and snap selections",
+            "Export PNG, PNG at 2x, JPEG, WebP"
+          ],
+          "codeRepository": "https://github.com/quasa0/paint.quasa0.com",
+          "author": { "@type": "Person", "name": "Anatolii", "url": "https://x.com/quasa0" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://paint.quasa0.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Is it free?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. Paint is open source under the MIT license and has no server. AI edits call the OpenAI API with your own key, so OpenAI bills you per generated image." }
+            },
+            {
+              "@type": "Question",
+              "name": "Does the AI change the whole image?",
+              "acceptedAnswer": { "@type": "Answer", "text": "No. Only the pixels inside your rectangle or lasso selection are replaced. Everything outside stays byte-for-byte the same." }
+            },
+            {
+              "@type": "Question",
+              "name": "Where are my drawings and API key stored?",
+              "acceptedAnswer": { "@type": "Answer", "text": "In your browser: drawings and their version history in IndexedDB, settings and the key in localStorage. Nothing is uploaded except the selected pixels sent to OpenAI when you generate." }
+            },
+            {
+              "@type": "Question",
+              "name": "Which models does it use?",
+              "acceptedAnswer": { "@type": "Answer", "text": "gpt-image-2.5-flare for fast edits and gpt-image-2.5-sunburst for the most precise ones, both through OpenAI's image edits endpoint." }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+
     <script>
-      // Apply the saved theme before first paint to avoid a light flash in dark mode.
       try {
         var t = (JSON.parse(localStorage.getItem('ai-paint:settings') || '{}').theme) || 'system';
         if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.dataset.theme = t;
       } catch (e) {}
     </script>
+    <link rel="stylesheet" href="/src/landing.css" />
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body class="landing">
+    <header class="l-nav">
+      <a class="l-brand" href="/" aria-label="Paint home">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l6 11H2z" fill="currentColor" /></svg>
+        <span>Paint</span>
+      </a>
+      <nav class="l-links" aria-label="Site">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/quasa0/paint.quasa0.com" rel="noopener">GitHub</a>
+        <a class="l-btn l-btn-sm" href="/app/">Open Paint</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="l-hero">
+        <p class="l-eyebrow">Open source · MIT · no sign-up</p>
+        <h1>MS Paint, with GPT Image 2.5</h1>
+        <p class="l-lede">Draw, select an area, describe the edit. The AI repaints only what you selected. Everything else stays exactly as you drew it.</p>
+        <div class="l-cta">
+          <a class="l-btn l-btn-lg" href="/app/" id="start">Start drawing</a>
+          <span class="l-cta-note">Free. Drawing tools work without a key; AI edits use your own OpenAI key.</span>
+        </div>
+        <figure class="l-shot">
+          <picture>
+            <source srcset="/og/screenshot-dark.jpg" media="(prefers-color-scheme: dark)" />
+            <img src="/og/screenshot-light.jpg" width="1364" height="1191" alt="Paint with a drawing open: classic tools on the left, the canvas in the middle, saved drawings and version history on the right." fetchpriority="high" />
+          </picture>
+        </figure>
+      </section>
+
+      <section id="how" class="l-section">
+        <h2>How it works</h2>
+        <ol class="l-steps">
+          <li><span class="l-num">1</span><div><strong>Draw or paste.</strong> Pencil, brushes, shapes, text, or an image from your clipboard.</div></li>
+          <li><span class="l-num">2</span><div><strong>Select an area.</strong> A rectangle or a free-form lasso. Only that area will change.</div></li>
+          <li><span class="l-num">3</span><div><strong>Describe the edit.</strong> "Turn this line into a bamboo stick." A drawn diagonal line comes back as a bamboo stick at the same angle.</div></li>
+          <li><span class="l-num">4</span><div><strong>Keep working.</strong> Edits run as separate jobs. Start another one elsewhere, or undo the result.</div></li>
+        </ol>
+      </section>
+
+      <section id="features" class="l-section">
+        <h2>What's in it</h2>
+        <ul class="l-grid">
+          <li><strong>The classic tools</strong>Pencil, three brushes, airbrush, eraser, fill, eyedropper, text, line, curve, rectangle, polygon, ellipse, rounded rectangle.</li>
+          <li><strong>Selections that behave</strong>Move, resize from the corners, rotate, flip, align to edges or center, duplicate. Snaps to the canvas with guides. Arrow keys nudge.</li>
+          <li><strong>History you can't lose</strong>Every action is a version saved in your browser. Undo, then draw, and the versions you skipped are kept as a branch.</li>
+          <li><strong>Your drawings, on your machine</strong>Autosaved to IndexedDB with thumbnails. Rename, reopen, delete. No account.</li>
+          <li><strong>Paste anything</strong>Images from the clipboard, files from Finder, or a URL. Drop onto the canvas to place.</li>
+          <li><strong>Export how you like</strong>PNG, PNG at 2×, JPEG, WebP, or just the selection. Copy the selection as PNG with transparency.</li>
+          <li><strong>Two models</strong>Flare for fast edits, Sunburst for precise ones, at low, medium, or high quality.</li>
+          <li><strong>Light and dark</strong>Geist type, hairline borders, keyboard shortcuts for every tool. Press <kbd>?</kbd> inside the app.</li>
+        </ul>
+      </section>
+
+      <section id="faq" class="l-section l-faq">
+        <h2>Questions</h2>
+        <details open>
+          <summary>Is it free?</summary>
+          <p>Yes. Paint is open source under the MIT license and has no server. AI edits call the OpenAI API with your own key, so OpenAI bills you per generated image (a few cents each at medium quality).</p>
+        </details>
+        <details>
+          <summary>Does the AI change the whole image?</summary>
+          <p>No. Only the pixels inside your rectangle or lasso selection are replaced. Everything outside stays byte-for-byte the same. By default the model sees only the selection; you can let it see the surroundings from the Image menu.</p>
+        </details>
+        <details>
+          <summary>Where are my drawings and API key stored?</summary>
+          <p>In your browser: drawings and their version history in IndexedDB, settings and the key in localStorage. Nothing is uploaded except the selected pixels sent to OpenAI when you generate. Clearing site data removes everything, so export what you want to keep.</p>
+        </details>
+        <details>
+          <summary>Which models does it use?</summary>
+          <p><code>gpt-image-2.5-flare</code> for fast edits and <code>gpt-image-2.5-sunburst</code> for the most precise ones, through OpenAI's image edits endpoint.</p>
+        </details>
+        <details>
+          <summary>Can I run it myself?</summary>
+          <p>Yes. It is a static Vite build. Clone <a href="https://github.com/quasa0/paint.quasa0.com" rel="noopener">the repository</a>, run <code>npm ci && npm run build</code>, and serve <code>dist/</code> from any static host.</p>
+        </details>
+      </section>
+
+      <section class="l-section l-final">
+        <h2>Ready when you are</h2>
+        <a class="l-btn l-btn-lg" href="/app/">Start drawing</a>
+      </section>
+    </main>
+
+    <footer class="l-footer">
+      <span>Paint · <a href="https://github.com/quasa0/paint.quasa0.com" rel="noopener">Source on GitHub</a> · MIT</span>
+      <span>Made by <a href="https://x.com/quasa0" rel="noopener">@quasa0</a></span>
+    </footer>
   </body>
 </html>

@@ -135,6 +135,12 @@ button {
   font-weight: 600;
   margin-right: 10px;
   letter-spacing: -0.01em;
+  color: inherit;
+  text-decoration: none;
+}
+.brand [data-tip]::after,
+.brand::after {
+  top: calc(100% + 6px);
 }
 .menu {
   position: relative;

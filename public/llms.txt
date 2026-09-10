@@ -1,0 +1,8 @@
+# Paint (paint.quasa0.com)
+
+> A browser-based Microsoft Paint clone with GPT Image 2.5 inpainting. Draw, select an area (rectangle or lasso), describe the edit, and the model repaints only the selection. Front-end only; users bring their own OpenAI API key, stored in the browser. Open source, MIT.
+
+- Editor: https://paint.quasa0.com/app/
+- Source: https://github.com/quasa0/paint.quasa0.com
+- Models: gpt-image-2.5-flare (fast), gpt-image-2.5-sunburst (precise), via POST /v1/images/edits
+- Storage: drawings, branching version history and settings live in IndexedDB/localStorage in the visitor's browser; nothing is uploaded except the selection sent to OpenAI when the user generates.

@@ -4,7 +4,7 @@ I wanted Microsoft Paint with GPT Image 2.5. So I built it.
 
 Draw, select an area, and describe the edit. Paint puts the result back into your canvas, inside your selection.
 
-**[Open Paint →](https://paint.quasa0.com)** · [Run locally](#run-locally) · [Contribute](CONTRIBUTING.md) · [MIT license](LICENSE)
+**[Open Paint →](https://paint.quasa0.com/app/)** · [Run locally](#run-locally) · [Contribute](CONTRIBUTING.md) · [MIT license](LICENSE)
 
 <img src="docs/screenshots/paint-light.png" alt="Paint with a drawing open, classic drawing tools on the left, and saved drawings and version history on the right." width="1440">
 

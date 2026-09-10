@@ -136,10 +136,10 @@ export function MenuBar({ workspace }: { workspace: RefObject<WorkspaceHandle | 
   return (
     <Ctx.Provider value={{ open, setOpen }}>
       <div className="menubar" ref={bar}>
-        <div className="brand" title="Paint">
+        <a className="brand" href="/" data-tip="About Paint">
           <Icon name="logo" size={14} />
           <span>Paint</span>
-        </div>
+        </a>
         <Menu id="file" label="File">
           <Item label="New" shortcut={`${MOD}N`} onSelect={() => { editor.newDocument(); workspace.current?.fit(); }} />
           <Item label="Open…" shortcut={`${MOD}O`} onSelect={() => fileInput.current?.click()} />
