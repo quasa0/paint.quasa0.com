@@ -133,13 +133,13 @@ function KeyDialog({ onClose }: { onClose: () => void }): JSX.Element {
       <Modal title="OpenAI account" onClose={close} actions={<button type="button" className="btn primary" onClick={close}>Done</button>}>
         <div className="acct">
           <span className="acct-dot" />
-          <div>
-            <div className="acct-name">{s.oauth.email ?? 'Signed in with OpenAI'}</div>
-            <div className="hint">ChatGPT {s.oauth.plan ? s.oauth.plan.charAt(0).toUpperCase() + s.oauth.plan.slice(1) : ''} plan · edits use your plan's included usage</div>
+          <div className="acct-text">
+            <div className="acct-name">Signed in with OpenAI</div>
+            <div className="acct-sub">{s.oauth.email ?? 'ChatGPT account'}{s.oauth.plan ? ` · ${s.oauth.plan.charAt(0).toUpperCase() + s.oauth.plan.slice(1)} plan` : ''}</div>
           </div>
           <button type="button" className="btn" onClick={() => editor.signOutOpenAI()} data-testid="signout">Sign out</button>
         </div>
-        {s.apiKey && <p className="hint">An API key is also saved; the OpenAI sign-in is used while you are signed in.</p>}
+        <p className="hint">Edits count toward your plan's included usage. {s.apiKey ? 'A saved API key is kept as a fallback for when you sign out.' : ''}</p>
       </Modal>
     );
   }
@@ -194,22 +194,24 @@ function KeyDialog({ onClose }: { onClose: () => void }): JSX.Element {
   }
 
   return (
-    <Modal title="Connect OpenAI" onClose={close} actions={<button type="button" className="btn" onClick={close}>Cancel</button>} width={460}>
-      <p>AI repaints need an OpenAI account. Pick one:</p>
+    <Modal title="Connect OpenAI" onClose={close} actions={<button type="button" className="btn" onClick={close}>Cancel</button>} width={440}>
+      <p className="connect-intro">AI repaints need an OpenAI account.</p>
       <div className="connect-options">
-        <button type="button" className="connect-card" onClick={() => void editor.signInWithOpenAI()} data-testid="signin-openai">
-          <Icon name="logo" size={16} />
-          <div>
-            <div className="connect-title">Sign in with OpenAI</div>
-            <div className="hint">Use your ChatGPT Plus, Pro or Team plan. No key to paste; edits count toward your plan's usage.</div>
-          </div>
+        <button type="button" className="connect-card primary" onClick={() => void editor.signInWithOpenAI()} data-testid="signin-openai">
+          <span className="connect-icon"><Icon name="logo" size={14} /></span>
+          <span className="connect-text">
+            <span className="connect-title">Sign in with OpenAI</span>
+            <span className="connect-sub">Uses your ChatGPT Plus, Pro or Team plan</span>
+          </span>
+          <span className="connect-arrow">→</span>
         </button>
         <button type="button" className="connect-card" onClick={() => setMode('key')} data-testid="use-key">
-          <Icon name="key" size={16} />
-          <div>
-            <div className="connect-title">Use an API key</div>
-            <div className="hint">Pay per image on your OpenAI API account. The key never leaves this browser.</div>
-          </div>
+          <span className="connect-icon"><Icon name="key" size={14} /></span>
+          <span className="connect-text">
+            <span className="connect-title">Use an API key</span>
+            <span className="connect-sub">Pay per image on your API account. Stays in this browser.</span>
+          </span>
+          <span className="connect-arrow">→</span>
         </button>
       </div>
     </Modal>

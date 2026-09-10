@@ -1480,33 +1480,73 @@ input[type='radio'] {
   color: var(--fg-3);
   font-size: 12px;
 }
+.connect-intro {
+  margin: 4px 0 12px;
+}
 .connect-options {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 10px 0 4px;
+  margin-bottom: 4px;
 }
 .connect-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
   gap: 12px;
-  align-items: flex-start;
+  width: 100%;
   text-align: left;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
   color: var(--fg);
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 .connect-card:hover {
+  border-color: var(--border-2);
+  background: var(--bg-2);
+}
+.connect-card.primary {
   border-color: var(--fg);
 }
-.connect-card svg {
-  margin-top: 2px;
-  flex: none;
+.connect-card.primary:hover {
+  background: var(--bg-3);
+}
+.connect-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--bg-3);
+  color: var(--fg);
+}
+.connect-card.primary .connect-icon {
+  background: var(--contrast);
+  color: var(--on-contrast);
+}
+.connect-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 .connect-title {
   font-weight: 500;
-  margin-bottom: 2px;
+  color: var(--fg);
+}
+.connect-sub {
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.connect-arrow {
+  color: var(--fg-3);
+  font-size: 14px;
+}
+.connect-card:hover .connect-arrow {
+  color: var(--fg);
 }
 .device-code {
   font-size: 30px;
@@ -1549,20 +1589,33 @@ input[type='radio'] {
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  margin: 8px 0;
+  margin: 8px 0 10px;
 }
-.acct > div {
+.acct-text {
   flex: 1;
+  min-width: 0;
 }
 .acct-dot {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 20%, transparent);
 }
 .acct-name {
   color: var(--fg);
   font-weight: 500;
+}
+.acct-sub {
+  font-size: 12px;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.key-btn .acct-dot {
+  box-shadow: none;
 }
 .modal-actions {
   display: flex;

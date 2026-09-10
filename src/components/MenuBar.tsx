@@ -215,8 +215,8 @@ export function MenuBar({ workspace }: { workspace: RefObject<WorkspaceHandle | 
           <Icon name={resolvedTheme(s.theme) === 'dark' ? 'sun' : 'moon'} size={14} />
         </button>
         <button type="button" className={`key-btn ${s.oauth || s.apiKey ? 'set' : ''}`} onClick={() => editor.openDialog('key')} title={s.oauth ? `Signed in with OpenAI${s.oauth.email ? ` as ${s.oauth.email}` : ''}` : s.apiKey ? 'Using an API key (stored only in this browser)' : 'Sign in with OpenAI or add an API key'} data-testid="key-btn">
-          <Icon name={s.oauth ? 'logo' : 'key'} size={13} />
-          {s.oauth ? (s.oauth.email ? s.oauth.email.split('@')[0] : 'OpenAI') : s.apiKey ? 'API key set' : 'Sign in with OpenAI'}
+          {s.oauth ? <span className="acct-dot" /> : <Icon name={s.apiKey ? 'key' : 'logo'} size={13} />}
+          {s.oauth ? 'Signed in with OpenAI' : s.apiKey ? 'API key set' : 'Sign in with OpenAI'}
         </button>
 
         <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void editor.openFile(f).then(() => workspace.current?.fit()); e.target.value = ''; }} />

@@ -47,8 +47,28 @@ function devKeyPlugin(): Plugin {
   };
 }
 
+/** Inline the landing stylesheet into index.html so the first paint needs no extra request. */
+function inlineLandingCss(): Plugin {
+  return {
+    name: 'ai-paint-inline-landing-css',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_o, bundle) {
+      const html = bundle['index.html'];
+      if (!html || html.type !== 'asset' || typeof html.source !== 'string') return;
+      const m = html.source.match(/<link rel="stylesheet"[^>]*href="(\/assets\/landing-[^"]+\.css)"[^>]*>/);
+      if (!m) return;
+      const key = m[1].slice(1);
+      const css = bundle[key];
+      if (!css || css.type !== 'asset') return;
+      html.source = html.source.replace(m[0], `<style>${css.source as string}</style>`);
+      delete bundle[key];
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), devKeyPlugin()],
+  plugins: [react(), devKeyPlugin(), inlineLandingCss()],
   appType: 'mpa',
   build: {
     rollupOptions: {

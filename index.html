@@ -34,10 +34,9 @@
     <meta name="twitter:image" content="https://paint.quasa0.com/og/cover.png" />
     <meta name="twitter:image:alt" content="Paint: MS Paint with GPT Image 2.5. Screenshot of the editor next to the headline." />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="preload" as="image" href="/og/screenshot-light.jpg" />
+    <link rel="preload" href="/fonts/geist-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" as="image" href="/demo/poster.avif" type="image/avif" imagesrcset="/demo/poster.avif" />
 
     <script type="application/ld+json">
     {
@@ -68,6 +67,17 @@
           ],
           "codeRepository": "https://github.com/quasa0/paint.quasa0.com",
           "author": { "@type": "Person", "name": "Anatolii", "url": "https://x.com/quasa0" }
+        },
+        {
+          "@type": "VideoObject",
+          "@id": "https://paint.quasa0.com/#demo",
+          "name": "Paint with GPT Image 2.5 – demo",
+          "description": "Selecting an area of a drawing and repainting it with GPT Image 2.5 inside a Microsoft Paint style editor.",
+          "thumbnailUrl": ["https://paint.quasa0.com/demo/poster.jpg"],
+          "uploadDate": "2026-09-09",
+          "duration": "PT16S",
+          "contentUrl": "https://paint.quasa0.com/demo/demo-h264.mp4",
+          "embedUrl": "https://paint.quasa0.com/#demo"
         },
         {
           "@type": "FAQPage",
@@ -132,11 +142,18 @@
           <a class="l-btn l-btn-lg" href="/app/" id="start">Start drawing</a>
           <span class="l-cta-note">Free. Drawing tools need nothing; AI edits use your ChatGPT plan or your own OpenAI key.</span>
         </div>
-        <figure class="l-shot">
-          <picture>
-            <source srcset="/og/screenshot-dark.jpg" media="(prefers-color-scheme: dark)" />
-            <img src="/og/screenshot-light.jpg" width="1364" height="1191" alt="Paint with a drawing open: classic tools on the left, the canvas in the middle, saved drawings and version history on the right." fetchpriority="high" />
+        <figure class="l-demo" id="demo">
+          <picture class="l-demo-poster">
+            <source srcset="/demo/poster.avif" type="image/avif" />
+            <source srcset="/demo/poster.webp" type="image/webp" />
+            <img src="/demo/poster.jpg" width="1080" height="1080" alt="Paint demo: a drawing is selected and repainted with GPT Image 2.5." fetchpriority="high" decoding="async" />
           </picture>
+          <video class="l-demo-video" width="1080" height="1080" muted playsinline loop preload="none" aria-label="16-second demo of selecting an area and repainting it with AI" tabindex="-1">
+            <source src="/demo/demo-av1.mp4" type="video/mp4; codecs=av01.0.08M.08" />
+            <source src="/demo/demo-h265.mp4" type="video/mp4; codecs=hvc1.1.6.L120.B0" />
+            <source src="/demo/demo-h264.mp4" type="video/mp4; codecs=avc1.640028" />
+          </video>
+          <button type="button" class="l-demo-play" aria-label="Play demo" hidden>▶</button>
         </figure>
       </section>
 
@@ -193,6 +210,36 @@
         <a class="l-btn l-btn-lg" href="/app/">Start drawing</a>
       </section>
     </main>
+
+    <script>
+      (function () {
+        var fig = document.getElementById('demo');
+        var v = fig && fig.querySelector('video');
+        if (!v) return;
+        var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var saveData = navigator.connection && navigator.connection.saveData;
+        var play = fig.querySelector('.l-demo-play');
+        function start() {
+          v.preload = 'auto';
+          var p = v.play();
+          if (p && p.catch) p.catch(function () { play.hidden = false; });
+        }
+        v.addEventListener('playing', function () { fig.classList.add('is-playing'); play.hidden = true; }, { once: true });
+        play.addEventListener('click', start);
+        if (reduce || saveData) { play.hidden = false; return; }
+        if ('IntersectionObserver' in window) {
+          var io = new IntersectionObserver(function (es) {
+            es.forEach(function (e) {
+              if (e.isIntersecting) { start(); io.disconnect(); }
+            });
+          }, { rootMargin: '200px' });
+          io.observe(fig);
+        } else start();
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) v.pause(); else if (fig.classList.contains('is-playing')) v.play().catch(function () {});
+        });
+      })();
+    </script>
 
     <footer class="l-footer">
       <span>Paint · <a href="https://github.com/quasa0/paint.quasa0.com" rel="noopener">Source on GitHub</a> · MIT</span>
