@@ -201,8 +201,8 @@ export class Editor {
   private floatingSource: HTMLCanvasElement | null = null;
   /** True when the floating pixels came from a lift (which already took the undo snapshot). */
   private floatingFromLift = false;
-  /** Bumped by structural document changes; in-flight AI results for an older epoch are discarded. */
-  private docEpoch = 0;
+  /** Bumped when a different drawing is opened; results for an older serial are dropped. */
+  private docSerial = 0;
   private clipboard: HTMLCanvasElement | null = null;
   private gesture: Gesture = { kind: 'none' };
   private curve: CurveState | null = null;
@@ -443,8 +443,7 @@ export class Editor {
       this.floatingSource = null;
       this.floatingFromLift = false;
       this.clearPreview();
-      this.bumpEpoch();
-      this.silent = true;
+        this.silent = true;
       this.doc.restore(px);
       this.silent = false;
       this.set({ headId: id, selection: null, selectionPath: null, floating: false, canUndo: this.hasParent(id), canRedo: !!this.childOf(id) });
@@ -618,7 +617,7 @@ export class Editor {
     const img = headPx ? null : await loadImage(rec.blob);
     this.commitText();
     this.finishPending();
-    this.bumpEpoch();
+    this.leaveDocument();
     this.floatingCanvas = null;
     this.floatingSource = null;
     this.floatingFromLift = false;
@@ -750,7 +749,6 @@ export class Editor {
     const pad = 16;
     const rect = clipRect({ x: x0 - pad, y: y0 - pad, w: x1 - x0 + 1 + pad * 2, h: y1 - y0 + 1 + pad * 2 }, this.doc.width, this.doc.height);
     if (!rect) return;
-    this.bumpEpoch();
     this.touch();
     this.doc.crop(rect);
     this.setSelection(null);
@@ -782,8 +780,13 @@ export class Editor {
   private setSelection(selection: Rect | null, selectionPath: Pt[] | null = null): void {
     this.set({ selection, selectionPath: selection ? selectionPath : null });
   }
-  private bumpEpoch(): void {
-    this.docEpoch++;
+  /** Switching to another drawing: in-flight repaints belong to the old one and cannot land here. */
+  private leaveDocument(): void {
+    this.docSerial++;
+    const running = this.jobAborts.size;
+    this.cancelGenerate();
+    if (this.state.jobs.length) this.set({ jobs: [] });
+    if (running) this.set({ status: `${running} running repaint${running > 1 ? 's' : ''} cancelled: switched drawing.` });
   }
   private requestFit(): void {
     this.set({ fitRequest: this.state.fitRequest + 1 });
@@ -1658,7 +1661,6 @@ export class Editor {
     this.commitFloating();
     const sel = this.state.selection && clipRect(this.state.selection, this.doc.width, this.doc.height);
     if (!sel) return;
-    this.bumpEpoch();
     this.doc.crop(sel);
     this.setSelection(null);
   }
@@ -1669,7 +1671,6 @@ export class Editor {
     this.commitText();
     this.finishPending();
     this.deselect();
-    this.bumpEpoch();
     this.touch();
   }
   rotate(deg: 90 | 180 | 270): void {
@@ -1714,7 +1715,7 @@ export class Editor {
   newDocument(w = DEFAULT_SIZE.w, h = DEFAULT_SIZE.h): void {
     this.commitText();
     this.finishPending();
-    this.bumpEpoch();
+    this.leaveDocument();
     this.floatingCanvas = null;
     this.floatingFromLift = false;
     this.clearPreview();
@@ -1738,7 +1739,7 @@ export class Editor {
     const img = await loadImage(file);
     this.commitText();
     this.finishPending();
-    this.bumpEpoch();
+    this.leaveDocument();
     this.floatingCanvas = null;
     this.floatingFromLift = false;
     this.clearPreview();
@@ -1953,9 +1954,7 @@ export class Editor {
     const id = ++this.jobSeq;
     const abort = new AbortController();
     this.jobAborts.set(id, abort);
-    const epoch = this.docEpoch;
-    // Remember what the area looked like; if it is painted over meanwhile, the result is stale.
-    const before = this.doc.ctx.getImageData(sel.x, sel.y, sel.w, sel.h).data;
+    const serial = this.docSerial;
     const job: AiJob = { id, rect: sel, path, prompt: prompt.trim(), status: 'running', message: 'Starting…' };
     this.set({ lastPrompt: prompt.trim() });
     this.rememberPrompt(prompt);
@@ -1977,12 +1976,12 @@ export class Editor {
           if (!abort.signal.aborted) this.updateJob(id, { message });
         },
       });
-      if (abort.signal.aborted) return;
-      const now = this.doc.ctx.getImageData(sel.x, sel.y, sel.w, sel.h).data;
-      if (epoch !== this.docEpoch || !sameBytes(before, now)) {
-        this.updateJob(id, { status: 'error', message: 'Discarded: the area changed while generating.' });
-        this.set({ ai: { status: 'error', message: 'Discarded: the area changed while generating.' } });
-        window.setTimeout(() => this.removeJob(id), 8000);
+      if (abort.signal.aborted || serial !== this.docSerial) return;
+      // The result always lands, even if the area was painted over or another job finished nearby
+      // meanwhile: the newest result wins, and undo (⌘Z) is there if that was not wanted.
+      if (!clipRect(sel, this.doc.width, this.doc.height)) {
+        this.updateJob(id, { status: 'error', message: 'Not applied: this area is outside the canvas now.' });
+        this.set({ ai: { status: 'error', message: 'Not applied: this area is outside the canvas now.' } });
         return;
       }
       this.touch();
@@ -2143,11 +2142,6 @@ function simplifyPath(pts: Pt[], tolerance: number): Pt[] {
   return pts.filter((_, i) => keep[i]);
 }
 
-function sameBytes(a: Uint8ClampedArray, b: Uint8ClampedArray): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
 
 
 /* ---------- API key persistence: localStorage + IndexedDB copy (same origin, survives redeploys) ---------- */
