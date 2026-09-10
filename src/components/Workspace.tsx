@@ -524,6 +524,9 @@ function JobOverlays(): JSX.Element | null {
               {job.status === 'error' ? (
                 <>
                   <span className="ai-job-error" role="alert" data-testid="ai-status">{job.message}</span>
+                  <button type="button" className="ai-retry" onClick={() => editor.retryJob(job.id)} title="Run this prompt again on the same area" data-testid="ai-retry">
+                    Retry
+                  </button>
                   <button type="button" className="ai-cancel" onClick={() => editor.dismissJob(job.id)} aria-label="Dismiss">
                     <Icon name="close" size={12} />
                   </button>

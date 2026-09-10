@@ -206,6 +206,36 @@ export function describeRegion(r: Rect, w: number, h: number): string {
   return `spanning ${pct(r.x, w)}–${pct(r.x + r.w, w)} of the width and ${pct(r.y, h)}–${pct(r.y + r.h, h)} of the height (from the top-left)`;
 }
 
+/** Our relay runs as a Vercel Function, which rejects request bodies over 4.5 MB (413). Keep the JSON under this. */
+const RELAY_BODY_BUDGET = 4_000_000;
+
+/**
+ * Encode a canvas as a data URL that fits `budget` bytes: PNG when it fits, otherwise JPEG at
+ * decreasing quality, and as a last resort a downscaled JPEG. The model resamples inputs anyway,
+ * so a lightly compressed photo loses nothing visible; line art stays PNG because it is small.
+ */
+function encodeWithinBudget(canvas: HTMLCanvasElement, budget: number): string {
+  const png = canvas.toDataURL('image/png');
+  if (png.length <= budget) return png;
+  for (const q of [0.92, 0.85, 0.75]) {
+    const jpg = canvas.toDataURL('image/jpeg', q);
+    if (jpg.length <= budget) return jpg;
+  }
+  let c = canvas;
+  for (let i = 0; i < 4; i++) {
+    const jpg = c.toDataURL('image/jpeg', 0.8);
+    if (jpg.length <= budget) return jpg;
+    const f = Math.sqrt(budget / jpg.length) * 0.95;
+    const next = makeCanvas(Math.max(64, Math.round(c.width * f)), Math.max(64, Math.round(c.height * f)));
+    const nctx = ctx2d(next);
+    nctx.imageSmoothingEnabled = true;
+    nctx.imageSmoothingQuality = 'high';
+    nctx.drawImage(c, 0, 0, next.width, next.height);
+    c = next;
+  }
+  return c.toDataURL('image/jpeg', 0.7);
+}
+
 /** Same edit through the OpenAI sign-in: JSON body, relayed by our function because chatgpt.com blocks browser origins. */
 async function callEditsViaOpenAI(body: Record<string, unknown>, auth: Extract<AiAuth, { kind: 'openai' }>, signal?: AbortSignal): Promise<string> {
   let res: Response;
@@ -230,6 +260,7 @@ async function callEditsViaOpenAI(body: Record<string, unknown>, auth: Extract<A
   if (!res.ok) {
     const detail = json.error?.message || json.detail || `OpenAI request failed (${res.status})`;
     if (res.status === 401) throw new OpenAIError(401, `Your OpenAI session is not valid. Sign in again. ${detail}`);
+    if (res.status === 413) throw new OpenAIError(413, 'The selection is too large to send. Try a smaller area.');
     if (res.status === 429) throw new OpenAIError(429, `Usage limit reached on your ChatGPT plan. ${detail}`);
     throw new OpenAIError(res.status, detail);
   }
@@ -305,15 +336,18 @@ export async function inpaint(opts: InpaintOptions): Promise<InpaintResult> {
   if (opts.auth.kind === 'openai') {
     // The sign-in backend keeps the input's aspect ratio but picks its own resolution (~1.6 MP);
     // the crop is already at the target aspect, and the result is resampled to the exact size below.
+    const withMask = mode !== 'nomask' && mode !== 'selection';
+    const maskUrl = withMask ? mask.toDataURL('image/png') : '';
+    const copies = mode === 'maskref' ? 2 : 1;
+    const imageUrl = encodeWithinBudget(image, Math.floor((RELAY_BODY_BUDGET - maskUrl.length - 2048) / copies));
     const body: Record<string, unknown> = {
       model: opts.model,
       prompt: buildPrompt(opts.prompt, mode, region),
-      images: [{ image_url: image.toDataURL('image/png') }],
+      images: Array.from({ length: copies }, () => ({ image_url: imageUrl })),
       size: `${plan.outW}x${plan.outH}`,
       quality: opts.quality,
     };
-    if (mode !== 'nomask' && mode !== 'selection') body.mask = { image_url: mask.toDataURL('image/png') };
-    if (mode === 'maskref') body.images = [{ image_url: image.toDataURL('image/png') }, { image_url: image.toDataURL('image/png') }];
+    if (withMask) body.mask = { image_url: maskUrl };
     b64 = await callEditsViaOpenAI(body, opts.auth, opts.signal);
   } else {
     try {

@@ -2024,6 +2024,17 @@ export class Editor {
     else this.removeJob(id);
   }
 
+  /** Run a failed job again: same area, same prompt. */
+  retryJob(id: number): void {
+    const job = this.state.jobs.find((j) => j.id === id);
+    if (!job || job.status !== 'error') return;
+    this.removeJob(id);
+    this.commitFloating();
+    if (this.state.tool !== 'select' && this.state.tool !== 'freeSelect') this.setTool(job.path ? 'freeSelect' : 'select');
+    this.setSelection(job.rect, job.path);
+    void this.generate(job.prompt);
+  }
+
   clearAiStatus(): void {
     if (this.state.ai.status !== 'running') this.set({ ai: { status: 'idle', message: '' } });
   }
