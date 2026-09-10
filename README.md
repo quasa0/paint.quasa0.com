@@ -6,7 +6,7 @@ Draw, select an area, and describe the edit. Paint puts the result back into you
 
 **[Open Paint →](https://paint.quasa0.com/app/)** · [Run locally](#run-locally) · [Contribute](CONTRIBUTING.md) · [MIT license](LICENSE)
 
-<img src="docs/screenshots/paint-light.png" alt="Paint with a drawing open, classic drawing tools on the left, and saved drawings and version history on the right." width="1440">
+https://github.com/user-attachments/assets/9be3b54f-4b81-4c8f-87de-09b1baeede30
 
 ## A paint app, with AI where you need it
 
