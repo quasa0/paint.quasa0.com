@@ -1,7 +1,8 @@
 import { PaintDoc, clipRect, ctx2d, hexToRgba, loadImage, makeCanvas, normRect, rectContains, type Pt, type Rect } from './doc';
 import * as draw from './draw';
-import { inpaint, pathToPath2D, type EditMode, type ModelId, type Quality } from './ai';
+import { inpaint, pathToPath2D, ShareAuthError, type EditMode, type ModelId, type Quality } from './ai';
 import { ensureFresh, loadOAuth, loadOAuthFromDb, requestDeviceCode, saveOAuth, waitForDeviceApproval, type DeviceCode, type OAuthTokens } from './oauth';
+import { createShare, fetchShare, loadGuestShare, loadOwnerShare, revokeShare, saveGuestShare, saveOwnerShare, ShareError, syncShare, takeShareFromUrl, type GuestShare, type OwnerShare } from './share';
 import { canvasToBlob, deleteDrawing, deleteVersion, deleteVersionsOf, getDrawing, getVersion, listDrawings, listVersions, makeThumb, newId, openDb, putDrawing, putVersion, type DrawingMeta, type VersionMeta } from './library';
 import { PALETTE, AIRBRUSH_SIZES, BRUSH_SIZES, ERASER_SIZES, LINE_WIDTHS, MAGNIFIER_ZOOMS, TOOLS, clampZoom, type BrushShape, type FillMode, type ShapeKind, type ToolId } from './tools';
 
@@ -77,6 +78,14 @@ export interface EditorState {
   oauth: OAuthTokens | null;
   /** Device-code sign-in in progress. */
   signIn: { code: DeviceCode; status: 'waiting' | 'error'; message?: string } | null;
+  /** Share link this browser created for its OpenAI sign-in. */
+  share: OwnerShare | null;
+  /** Share link this browser opened: edits run on the owner's plan. */
+  guestShare: GuestShare | null;
+  /** Share link creation / lookup in progress. */
+  shareBusy: boolean;
+  /** Last share problem, shown inside the account dialog. */
+  shareError: string | null;
   model: ModelId;
   quality: Quality;
   editMode: EditMode;
@@ -265,6 +274,10 @@ export class Editor {
       apiKey: loadKey(),
       oauth: loadOAuth(),
       signIn: null,
+      share: loadOwnerShare(),
+      guestShare: loadGuestShare(),
+      shareBusy: false,
+      shareError: null,
       model: s.model ?? 'gpt-image-2.5-flare',
       quality: s.quality ?? 'medium',
       editMode: s.editMode ?? 'selection',
@@ -295,6 +308,8 @@ export class Editor {
     // localStorage can be missing (private mode, storage pressure); fall back to the IndexedDB copy.
     if (!this.state.apiKey) void loadKeyFromDb().then((k) => { if (k && !this.state.apiKey) this.set({ apiKey: k }); });
     if (!this.state.oauth) void loadOAuthFromDb().then((t) => { if (t && !this.state.oauth) this.set({ oauth: t }); });
+    const sharedId = takeShareFromUrl();
+    if (sharedId) void this.useShareLink(sharedId);
   }
 
   // ---------- store plumbing ----------
@@ -804,17 +819,19 @@ export class Editor {
     if (shiftHeld !== this.state.shiftHeld) this.set({ shiftHeld });
   }
   openDialog(dialog: DialogId): void {
-    this.set({ dialog });
+    this.set({ dialog, shareError: null });
   }
 
   setApiKey(apiKey: string): void {
     apiKey = apiKey.trim();
     this.set({ apiKey });
     saveKey(apiKey);
+    // Choosing a key while on someone's share link means "use mine instead".
+    if (apiKey && this.state.guestShare) this.leaveShare();
   }
-  /** True when generation is possible with either auth method. */
+  /** True when generation is possible with any auth method. */
   get canGenerate(): boolean {
-    return !!this.state.oauth || !!this.state.apiKey;
+    return !!this.state.oauth || !!this.state.guestShare || !!this.state.apiKey;
   }
 
   private signInAbort: AbortController | null = null;
@@ -830,6 +847,9 @@ export class Editor {
       const tokens = await waitForDeviceApproval(code, abort.signal);
       if (abort.signal.aborted) return;
       saveOAuth(tokens);
+      if (this.state.guestShare) this.leaveShare();
+      // A share created earlier keeps working with the renewed sign-in.
+      if (this.state.share) void syncShare(this.state.share, tokens).catch(() => undefined);
       this.set({ oauth: tokens, signIn: null, dialog: 'none', status: `Signed in to OpenAI${tokens.email ? ` as ${tokens.email}` : ''}.` });
     } catch (e) {
       if (abort.signal.aborted) return;
@@ -852,9 +872,84 @@ export class Editor {
     this.set({ oauth: tokens });
   }
 
-  signOutOpenAI(): void {
+  /** Sign out; a share link is revoked first so it does not outlive the session it tunnels. */
+  async signOutOpenAI(): Promise<void> {
+    if (this.state.share) {
+      const ok = await this.revokeShareLink();
+      if (!ok) return;
+    }
     saveOAuth(null);
     this.set({ oauth: null });
+  }
+
+  /** Owner: publish this browser's sign-in as a link others can use for edits. */
+  async createShareLink(ttlMs: number): Promise<void> {
+    const tokens = this.state.oauth;
+    if (!tokens) throw new Error('Sign in with OpenAI before sharing.');
+    this.set({ shareBusy: true, shareError: null });
+    try {
+      const fresh = await ensureFresh(tokens);
+      if (fresh !== tokens) {
+        saveOAuth(fresh);
+        this.set({ oauth: fresh });
+      }
+      const share = await createShare(fresh, ttlMs);
+      try {
+        saveOwnerShare(share);
+      } catch {
+        // No way to remember the manage key: do not leave a link nobody can revoke.
+        await revokeShare(share).catch(() => undefined);
+        throw new Error('This browser cannot store the link (private mode or storage full), so it was not created.');
+      }
+      this.set({ share, status: 'Share link created.' });
+    } catch (e) {
+      this.set({ shareError: e instanceof Error ? e.message : String(e) });
+    } finally {
+      this.set({ shareBusy: false });
+    }
+  }
+
+  /** Owner: stop the link. Local state is cleared only once the server confirms, so a failed revoke can be retried. */
+  async revokeShareLink(): Promise<boolean> {
+    const share = this.state.share;
+    if (!share) return true;
+    this.set({ shareBusy: true, shareError: null });
+    try {
+      await revokeShare(share);
+    } catch (e) {
+      // 404: the server already forgot it (expired or revoked elsewhere). Anything else keeps the link so the owner can retry.
+      if (!(e instanceof ShareError && e.status === 404)) {
+        this.set({ shareBusy: false, shareError: `Could not revoke the link: ${e instanceof Error ? e.message : String(e)}` });
+        return false;
+      }
+    }
+    saveOwnerShare(null);
+    this.set({ share: null, shareBusy: false, status: 'Share link revoked.' });
+    return true;
+  }
+
+  /** Guest: adopt a share link (from the URL) after checking it with the server. */
+  async useShareLink(id: string): Promise<void> {
+    if (this.state.oauth) {
+      this.set({ dialog: 'key', shareError: 'You are signed in with your own OpenAI account, so this share link was not used. Sign out first to use it.' });
+      return;
+    }
+    this.set({ shareBusy: true, shareError: null, status: 'Checking share link…' });
+    try {
+      const guestShare = await fetchShare(id);
+      saveGuestShare(guestShare);
+      this.set({ guestShare, dialog: 'key', status: `Using ${guestShare.ownerEmail ?? 'a shared'} OpenAI account for edits.` });
+    } catch (e) {
+      this.set({ shareError: e instanceof Error ? e.message : String(e), dialog: 'key', status: DEFAULT_STATUS });
+    } finally {
+      this.set({ shareBusy: false });
+    }
+  }
+
+  /** Guest: forget the share link. */
+  leaveShare(): void {
+    saveGuestShare(null);
+    this.set({ guestShare: null });
   }
 
   setModel(model: ModelId): void {
@@ -1934,6 +2029,8 @@ export class Editor {
         if (fresh !== s.oauth) {
           saveOAuth(fresh);
           this.set({ oauth: fresh });
+          // Guests of this account must keep working after a refresh rotated the tokens.
+          if (s.share) void syncShare(s.share, fresh).catch(() => undefined);
         }
         auth = { kind: 'openai', accessToken: fresh.accessToken, accountId: fresh.accountId };
       } catch (e) {
@@ -1941,6 +2038,13 @@ export class Editor {
         saveOAuth(null);
         return;
       }
+    } else if (s.guestShare) {
+      if (s.guestShare.expiresAt <= Date.now()) {
+        this.leaveShare();
+        this.set({ dialog: 'key', shareError: 'The share link you were using has expired.' });
+        return;
+      }
+      auth = { kind: 'share', shareId: s.guestShare.id };
     } else {
       auth = { kind: 'apiKey', apiKey: s.apiKey };
     }
@@ -2000,6 +2104,11 @@ export class Editor {
       const message = e instanceof Error ? e.message : String(e);
       this.updateJob(id, { status: 'error', message });
       this.set({ ai: { status: 'error', message } });
+      // The relay refused the share link itself (revoked, expired, owner gone): stop offering it.
+      if (e instanceof ShareAuthError && auth.kind === 'share' && this.state.guestShare?.id === auth.shareId) {
+        this.leaveShare();
+        this.set({ dialog: 'key', shareError: message });
+      }
     } finally {
       this.jobAborts.delete(id);
       if (this.jobAborts.size === 0 && this.state.ai.status === 'running') this.set({ ai: { status: 'idle', message: '' } });

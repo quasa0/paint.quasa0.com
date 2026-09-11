@@ -36,13 +36,15 @@ function devKeyPlugin(): Plugin {
           res.end(JSON.stringify({ error: String(e) }));
         }
       });
-      // Run the Vercel function locally so "Sign in with OpenAI" works under `vite`.
-      server.middlewares.use('/api/codex-images', (req, res) => {
-        void server.ssrLoadModule('/api/codex-images.ts').then((m) => (m.default as (q: typeof req, r: typeof res) => Promise<void>)(req, res)).catch((e) => {
-          res.statusCode = 500;
-          res.end(String(e));
+      // Run the Vercel functions locally so "Sign in with OpenAI" and share links work under `vite`.
+      for (const name of ['codex-images', 'share']) {
+        server.middlewares.use(`/api/${name}`, (req, res) => {
+          void server.ssrLoadModule(`/api/${name}.ts`).then((m) => (m.default as (q: typeof req, r: typeof res) => Promise<void>)(req, res)).catch((e) => {
+            res.statusCode = 500;
+            res.end(String(e));
+          });
         });
-      });
+      }
     },
   };
 }

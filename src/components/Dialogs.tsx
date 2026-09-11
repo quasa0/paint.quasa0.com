@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { useEditor, useEditorState } from '../hooks';
 import { Icon } from './Icons';
 import { VERIFY_URL } from '../paint/oauth';
+import { SHARE_TTL_OPTIONS, shareUrl } from '../paint/share';
 
 function Modal({ title, children, onClose, actions, width }: { title: string; children: ReactNode; onClose: () => void; actions: ReactNode; width?: number }): JSX.Element {
   const box = useRef<HTMLDivElement>(null);
@@ -130,16 +131,17 @@ function KeyDialog({ onClose }: { onClose: () => void }): JSX.Element {
 
   if (s.oauth) {
     return (
-      <Modal title="OpenAI account" onClose={close} actions={<button type="button" className="btn primary" onClick={close}>Done</button>}>
+      <Modal title="OpenAI account" onClose={close} actions={<button type="button" className="btn primary" onClick={close}>Done</button>} width={460}>
         <div className="acct">
           <span className="acct-dot" />
           <div className="acct-text">
             <div className="acct-name">Signed in with OpenAI</div>
-            <div className="acct-sub">{s.oauth.email ?? 'ChatGPT account'}{s.oauth.plan ? ` · ${s.oauth.plan.charAt(0).toUpperCase() + s.oauth.plan.slice(1)} plan` : ''}</div>
+            <div className="acct-sub">{s.oauth.email ?? 'ChatGPT account'}{s.oauth.plan ? ` · ${planLabel(s.oauth.plan)} plan` : ''}</div>
           </div>
-          <button type="button" className="btn" onClick={() => editor.signOutOpenAI()} data-testid="signout">Sign out</button>
+          <button type="button" className="btn" disabled={s.shareBusy} onClick={() => void editor.signOutOpenAI()} data-testid="signout">Sign out</button>
         </div>
         <p className="hint">Edits count toward your plan's included usage. {s.apiKey ? 'A saved API key is kept as a fallback for when you sign out.' : ''}</p>
+        <ShareSection />
       </Modal>
     );
   }
@@ -193,8 +195,27 @@ function KeyDialog({ onClose }: { onClose: () => void }): JSX.Element {
     );
   }
 
+  if (s.guestShare) {
+    const g = s.guestShare;
+    return (
+      <Modal title="Shared OpenAI access" onClose={close} actions={<button type="button" className="btn primary" onClick={close}>Done</button>} width={460}>
+        <div className="acct">
+          <span className="acct-dot" />
+          <div className="acct-text">
+            <div className="acct-name">Shared by {g.ownerEmail ?? 'another Paint user'}</div>
+            <div className="acct-sub">{g.ownerPlan ? `${planLabel(g.ownerPlan)} plan · ` : ''}link expires {new Date(g.expiresAt).toLocaleDateString()}</div>
+          </div>
+          <button type="button" className="btn" onClick={() => editor.leaveShare()} data-testid="share-leave">Stop using</button>
+        </div>
+        <p className="hint">Edits run on the owner's ChatGPT plan through this site's relay; you never see their sign-in. The owner can revoke the link at any time.{s.apiKey ? ' Your saved API key is not used while this link is active.' : ''}</p>
+        <p className="hint">Prefer your own account? <button type="button" className="link" onClick={() => void editor.signInWithOpenAI()} data-testid="share-signin">Sign in with OpenAI</button> or <button type="button" className="link" onClick={() => setMode('key')} data-testid="share-use-key">use an API key</button>.</p>
+      </Modal>
+    );
+  }
+
   return (
     <Modal title="Connect OpenAI" onClose={close} actions={<button type="button" className="btn" onClick={close}>Cancel</button>} width={440}>
+      {s.shareError && <p className="share-error" role="alert" data-testid="share-error">{s.shareError}</p>}
       <p className="connect-intro">AI repaints need an OpenAI account.</p>
       <div className="connect-options">
         <button type="button" className="connect-card primary" onClick={() => void editor.signInWithOpenAI()} data-testid="signin-openai">
@@ -215,6 +236,70 @@ function KeyDialog({ onClose }: { onClose: () => void }): JSX.Element {
         </button>
       </div>
     </Modal>
+  );
+}
+
+const planLabel = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
+
+/** Owner side of share links: create, copy, revoke (two clicks, like deleting a drawing). */
+function ShareSection(): JSX.Element {
+  const editor = useEditor();
+  const s = useEditorState();
+  const [ttl, setTtl] = useState(SHARE_TTL_OPTIONS[1].ms);
+  const [copied, setCopied] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const urlInput = useRef<HTMLInputElement>(null);
+  const share = s.share;
+  const error = s.shareError && <p className="share-error" role="alert" data-testid="share-error">{s.shareError}</p>;
+  if (!share) {
+    return (
+      <div className="share">
+        <div className="share-head">
+          <div className="acct-name">Share your access</div>
+          <p className="hint">Give others a link to run edits on your ChatGPT plan. Anyone with the link can use it until it expires or you revoke it. Your sign-in stays on the server; guests never see it.</p>
+        </div>
+        {error}
+        <div className="share-row">
+          <label className="share-ttl">Expires in
+            <select value={ttl} onChange={(e) => setTtl(Number(e.target.value))} aria-label="Share link lifetime" data-testid="share-ttl">
+              {SHARE_TTL_OPTIONS.map((o) => <option key={o.ms} value={o.ms}>{o.label}</option>)}
+            </select>
+          </label>
+          <button type="button" className="btn primary" disabled={s.shareBusy} onClick={() => void editor.createShareLink(ttl)} data-testid="share-create">{s.shareBusy ? 'Creating…' : 'Create share link'}</button>
+        </div>
+      </div>
+    );
+  }
+  const url = shareUrl(share.id);
+  const copy = () => {
+    const done = () => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    };
+    const fallback = () => {
+      urlInput.current?.focus();
+      urlInput.current?.select();
+    };
+    if (!navigator.clipboard) return fallback();
+    navigator.clipboard.writeText(url).then(done, fallback);
+  };
+  return (
+    <div className="share">
+      <div className="share-head">
+        <div className="acct-name">Sharing your access</div>
+        <p className="hint">Anyone who opens this link runs edits on your plan. Expires {new Date(share.expiresAt).toLocaleDateString()}.</p>
+      </div>
+      {error}
+      <div className="share-row">
+        <input ref={urlInput} className="share-url mono" readOnly value={url} onFocus={(e) => e.target.select()} aria-label="Share link" data-testid="share-url" />
+        <button type="button" className="btn" onClick={copy} aria-live="polite" data-testid="share-copy">{copied ? 'Copied' : 'Copy'}</button>
+        {confirmRevoke ? (
+          <button type="button" className="btn danger" disabled={s.shareBusy} onClick={() => { setConfirmRevoke(false); void editor.revokeShareLink(); }} onBlur={() => setConfirmRevoke(false)} data-testid="share-revoke-confirm">{s.shareBusy ? 'Revoking…' : 'Confirm revoke'}</button>
+        ) : (
+          <button type="button" className="btn" disabled={s.shareBusy} onClick={() => setConfirmRevoke(true)} data-testid="share-revoke">Revoke</button>
+        )}
+      </div>
+    </div>
   );
 }
 
