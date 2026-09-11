@@ -331,7 +331,7 @@ function AiBar({ anchor }: { anchor: { left: number; top: number; width: number;
   const input = useRef<HTMLTextAreaElement>(null);
   const bar = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: Math.max(8, anchor.left), top: anchor.top + anchor.height + 8 });
-  const hasKey = !!s.apiKey || !!s.oauth;
+  const hasKey = !!s.apiKey || !!s.oauth || !!s.guestShare;
   // A click in the Prompts section drops that text here (state-from-props pattern, no effect needed).
   const [seenFill, setSeenFill] = useState(s.promptFill.n);
   if (s.promptFill.n !== seenFill) {

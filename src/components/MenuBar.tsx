@@ -215,9 +215,15 @@ export function MenuBar({ workspace }: { workspace: RefObject<WorkspaceHandle | 
         <button type="button" className="icon-btn" onClick={() => editor.setTheme(resolvedTheme(s.theme) === 'dark' ? 'light' : 'dark')} title="Toggle light / dark" aria-label="Toggle appearance" data-testid="theme-toggle">
           <Icon name={resolvedTheme(s.theme) === 'dark' ? 'sun' : 'moon'} size={14} />
         </button>
-        <button type="button" className={`key-btn ${s.oauth || s.apiKey ? 'set' : ''}`} onClick={() => editor.openDialog('key')} title={s.oauth ? `Signed in with OpenAI${s.oauth.email ? ` as ${s.oauth.email}` : ''}` : s.apiKey ? 'Using an API key (stored only in this browser)' : 'Sign in with OpenAI or add an API key'} data-testid="key-btn">
-          {s.oauth ? <span className="acct-dot" /> : <Icon name={s.apiKey ? 'key' : 'logo'} size={13} />}
-          {s.oauth ? 'Signed in with OpenAI' : s.apiKey ? 'API key set' : 'Sign in with OpenAI'}
+        <button
+          type="button"
+          className={`key-btn ${s.oauth || s.guestShare || s.apiKey ? 'set' : ''}`}
+          onClick={() => editor.openDialog('key')}
+          title={s.oauth ? `Signed in with OpenAI${s.oauth.email ? ` as ${s.oauth.email}` : ''}${s.share ? ' · sharing a link' : ''}` : s.guestShare ? `Using ${s.guestShare.ownerEmail ?? "someone else's"} OpenAI account through a share link` : s.apiKey ? 'Using an API key (stored only in this browser)' : 'Sign in with OpenAI or add an API key'}
+          data-testid="key-btn"
+        >
+          {s.oauth || s.guestShare ? <span className="acct-dot" /> : <Icon name={s.apiKey ? 'key' : 'logo'} size={13} />}
+          {s.oauth ? 'Signed in with OpenAI' : s.guestShare ? 'Shared OpenAI access' : s.apiKey ? 'API key set' : 'Sign in with OpenAI'}
         </button>
 
         <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void editor.openFile(f).then(() => workspace.current?.fit()); e.target.value = ''; }} />

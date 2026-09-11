@@ -106,8 +106,14 @@ export function buildPrompt(userPrompt: string, mode: EditMode, region: string):
   ].join(' ');
 }
 
-/** How requests are authorized: a personal API key, or an OpenAI (ChatGPT) sign-in relayed by /api/codex-images. */
-export type AiAuth = { kind: 'apiKey'; apiKey: string } | { kind: 'openai'; accessToken: string; accountId: string };
+/**
+ * How requests are authorized: a personal API key, an OpenAI (ChatGPT) sign-in relayed by
+ * /api/codex-images, or a share link whose owner's sign-in the relay uses on the guest's behalf.
+ */
+export type AiAuth =
+  | { kind: 'apiKey'; apiKey: string }
+  | { kind: 'openai'; accessToken: string; accountId: string }
+  | { kind: 'share'; shareId: string };
 
 export interface InpaintOptions {
   source: HTMLCanvasElement;
@@ -236,22 +242,26 @@ function encodeWithinBudget(canvas: HTMLCanvasElement, budget: number): string {
   return c.toDataURL('image/jpeg', 0.7);
 }
 
-/** Same edit through the OpenAI sign-in: JSON body, relayed by our function because chatgpt.com blocks browser origins. */
-async function callEditsViaOpenAI(body: Record<string, unknown>, auth: Extract<AiAuth, { kind: 'openai' }>, signal?: AbortSignal): Promise<string> {
+/** Thrown when the relay rejects a share link itself (revoked, expired, owner signed out). */
+export class ShareAuthError extends OpenAIError {}
+
+/** Same edit through the OpenAI sign-in or a share link: JSON body, relayed by our function because chatgpt.com blocks browser origins. */
+async function callEditsViaOpenAI(body: Record<string, unknown>, auth: Exclude<AiAuth, { kind: 'apiKey' }>, signal?: AbortSignal): Promise<string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (auth.kind === 'share') headers['X-Share-Token'] = auth.shareId;
+  else {
+    headers.Authorization = `Bearer ${auth.accessToken}`;
+    headers['chatgpt-account-id'] = auth.accountId;
+  }
   let res: Response;
   try {
-    res = await fetch('/api/codex-images?op=edits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.accessToken}`, 'chatgpt-account-id': auth.accountId },
-      body: JSON.stringify(body),
-      signal,
-    });
+    res = await fetch('/api/codex-images?op=edits', { method: 'POST', headers, body: JSON.stringify(body), signal });
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     throw new OpenAIError(0, 'Could not reach the server.');
   }
   const text = await res.text();
-  let json: { data?: { b64_json?: string }[]; error?: { message?: string }; detail?: string } = {};
+  let json: { data?: { b64_json?: string }[]; error?: { message?: string; share?: boolean }; detail?: string } = {};
   try {
     json = JSON.parse(text);
   } catch {
@@ -259,9 +269,11 @@ async function callEditsViaOpenAI(body: Record<string, unknown>, auth: Extract<A
   }
   if (!res.ok) {
     const detail = json.error?.message || json.detail || `OpenAI request failed (${res.status})`;
-    if (res.status === 401) throw new OpenAIError(401, `Your OpenAI session is not valid. Sign in again. ${detail}`);
+    if (json.error?.share) throw new ShareAuthError(res.status, detail);
+    const shared = auth.kind === 'share';
+    if (res.status === 401) throw new OpenAIError(401, shared ? `The shared OpenAI session is not valid. ${detail}` : `Your OpenAI session is not valid. Sign in again. ${detail}`);
     if (res.status === 413) throw new OpenAIError(413, 'The selection is too large to send. Try a smaller area.');
-    if (res.status === 429) throw new OpenAIError(429, `Usage limit reached on your ChatGPT plan. ${detail}`);
+    if (res.status === 429) throw new OpenAIError(429, `Usage limit reached on ${shared ? 'the shared' : 'your'} ChatGPT plan. ${detail}`);
     throw new OpenAIError(res.status, detail);
   }
   const b64 = json.data?.[0]?.b64_json;
@@ -333,7 +345,7 @@ export async function inpaint(opts: InpaintOptions): Promise<InpaintResult> {
 
   onStatus?.(`Generating with ${opts.model}…`);
   let b64: string;
-  if (opts.auth.kind === 'openai') {
+  if (opts.auth.kind !== 'apiKey') {
     // The sign-in backend keeps the input's aspect ratio but picks its own resolution (~1.6 MP);
     // the crop is already at the target aspect, and the result is resampled to the exact size below.
     const withMask = mode !== 'nomask' && mode !== 'selection';

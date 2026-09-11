@@ -23,6 +23,10 @@ Draw, select an area, and describe the edit. Paint puts the result back into you
 3. Sign in with OpenAI (uses your ChatGPT plan) or add your own API key, then enter a prompt, such as “Make this chart more impressive.”
 4. Generate. Continue working elsewhere while the edit runs, or undo the result if you prefer the original.
 
+### Share your ChatGPT plan
+
+Signed in with OpenAI? Open the account dialog (the button in the top right) and choose **Create share link**. Anyone who opens that link runs AI edits on your plan without signing in; they never see your account. The link expires after the period you pick (1 to 90 days), is limited to 40 edits per 10 minutes, and you can revoke it at any time or by signing out. Guests keep drawing normally and see whose account they are using.
+
 By default, the model receives the selection's bounding rectangle. **Image → AI sees surroundings too** includes nearby pixels for context. For a lasso, the request can include pixels outside its outline but inside that rectangle; Paint clips the returned patch to the lasso. Pixels outside the selection stay unchanged.
 
 <details>
@@ -52,13 +56,15 @@ Open the local URL printed by Vite. Drawing tools work without an account. AI ed
 | `npm run build` | Type-check and build the static app into `dist/` |
 | `npm run preview` | Preview the production build locally |
 
-To host your own copy, deploy to Vercel (the `api/` function relays sign-in requests) or serve `dist/` from a static host with the API-key path only. No server-side key is required; each visitor brings their own account.
+To host your own copy, deploy to Vercel (the `api/` functions relay sign-in requests) or serve `dist/` from a static host with the API-key path only. No server-side key is required; each visitor brings their own account.
+
+Share links need a Redis store: attach Upstash Redis to the Vercel project (or set `KV_REST_API_URL` and `KV_REST_API_TOKEN`). Without it, `/api/share` answers 503 and everything else keeps working. The dev server keeps share links in memory.
 
 ## Your images and API key
 
 Paint stores drawings and their version history in IndexedDB. It stores settings, your API key and sign-in tokens in localStorage, with an IndexedDB copy. This storage belongs to the browser and site you use; clearing site data removes it. Export files you want to keep.
 
-AI requests go directly from your browser to OpenAI's [image edits API](https://developers.openai.com/api/docs/guides/image-generation). Paint has no backend that collects your key or drawings. AI edits send your prompt and the image region described above to OpenAI, and OpenAI bills your account. The browser stores the key as readable text, so use the app only on devices and deployments you trust.
+AI requests go directly from your browser to OpenAI's [image edits API](https://developers.openai.com/api/docs/guides/image-generation). Paint has no backend that collects your key or drawings. The one exception is a share link you create: your OpenAI sign-in tokens are then stored server-side under a random id until the link expires or you revoke it, so that guests' edits can run on your plan. AI edits send your prompt and the image region described above to OpenAI, and OpenAI bills your account. The browser stores the key as readable text, so use the app only on devices and deployments you trust.
 
 ## Code map
 
@@ -68,6 +74,8 @@ React and TypeScript provide the interface; Canvas 2D handles pixels. Vite build
 | --- | --- |
 | `src/paint/editor.ts` | Tools, selections, editor state, and concurrent AI jobs |
 | `src/paint/ai.ts` | Image request preparation, OpenAI calls, and result placement |
+| `src/paint/oauth.ts` and `share.ts` | OpenAI sign-in and share links (client side) |
+| `api/` | Vercel functions: the sign-in relay and share-link storage |
 | `src/paint/doc.ts` and `draw.ts` | Canvas operations and drawing primitives |
 | `src/paint/library.ts` | Browser database, saved drawings, and versions |
 | `src/components/` | Menus, workspace, palette, dialogs, and sidebars |
